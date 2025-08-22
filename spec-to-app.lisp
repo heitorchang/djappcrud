@@ -3,7 +3,7 @@
 
 (defun convert-pairs (pairs)
   "Convert a list of properties given as a flat list, alternating keys and values (a 1 b 2 c 3)"
-  (format nil "~{~A=~A~}" pairs))
+  (format nil "~{~A=~A,~}" pairs))
 
 (defun convert-model-field-value (field-value)
   "Convert the value side of the field assignment"
@@ -39,7 +39,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 
 from django.db.models import Model, ForeignKey, CASCADE, SET_NULL
-from django.db.models import CharField, TextField, IntegerField, FloatField, DecimalField, TextField, ImageField, BooleanField
+from django.db.models import CharField, TextField, IntegerField, FloatField, DecimalField, TextField, ImageField, DateField, DateTimeField, BooleanField
 
 
 ~{~A~}
