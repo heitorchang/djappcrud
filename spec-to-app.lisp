@@ -85,7 +85,7 @@ TODO: cond on action, each action has its own view action
       (princ (format nil "from django.urls import path
 from . import views
 
-app_name = ~A
+app_name = '~A'
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -98,6 +98,7 @@ urlpatterns = [
 
 (defun write-views (spec)
   "Write views.py"
+  (format t "TODO: Add an index view~%")
   (let ((app-name (getf spec :app-name))
         (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models))))
     (with-open-file (out (concatenate 'string *output-app-dir* "views.py")
@@ -127,6 +128,7 @@ from django.shortcuts import render
 
 (defun write-templates (spec)
   "Write HTML templates"
+  (format t "TODO: Add an index template~%")
   (let* ((app-name (getf spec :app-name))
          (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models)))
          (templates-dir (concatenate 'string *output-app-dir* "templates/" app-name "/")))
