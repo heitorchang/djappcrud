@@ -98,7 +98,9 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (url-name model-name "add")
         (url-name model-name "do_add")
         (url-name model-name "edit" "<int:item_id>/")
-        (url-name model-name "do_edit")))
+        (url-name model-name "do_edit")
+        (url-name model-name "delete" "<int:item_id>/")
+        (url-name model-name "do_delete")))
 
 (defun list-view (app-name model)
   (let ((action "list")
@@ -222,6 +224,33 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             (mapcar #'do-edit-view-field-pairs model-fields)
             app-name (string-downcase model-name))))
 
+(defun delete-view (app-name model)
+  (let ((action "delete")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request, item_id):
+    item = models.~A.objects.get(user=request.user, pk=item_id)
+    return render(request, '~A/~A_~A.html', {'item': item})
+"
+            (string-downcase model-name) action
+            model-name
+            app-name (string-downcase model-name) action)))
+
+(defun do-delete-view (app-name model)
+  (let ((action "do_delete")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request):
+    item = models.~A.objects.get(
+        user = request.user,
+        pk = request.POST['id']
+    )
+    item.delete()
+
+    return redirect('~A:~A_list')
+"
+            (string-downcase model-name) action
+            model-name
+            app-name (string-downcase model-name))))
+
 (defun view-name-for-model-action (app-name model action)
   "Create a view function definition."
   (cond ((string= action "list") (list-view app-name model))
@@ -229,7 +258,9 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         ((string= action "add") (add-view app-name model))
         ((string= action "do_add") (do-add-view app-name model))
         ((string= action "edit") (edit-view app-name model))
-        ((string= action "do_edit") (do-edit-view app-name model))))
+        ((string= action "do_edit") (do-edit-view app-name model))
+        ((string= action "delete") (delete-view app-name model))
+        ((string= action "do_delete") (do-delete-view app-name model))))
 
 (defun crud-views (app-name model)
   "Generate views for the given name, returning a list of function definitions"
@@ -238,7 +269,9 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (view-name-for-model-action app-name model "add")
         (view-name-for-model-action app-name model "do_add")
         (view-name-for-model-action app-name model "edit")
-        (view-name-for-model-action app-name model "do_edit")))
+        (view-name-for-model-action app-name model "do_edit")
+        (view-name-for-model-action app-name model "delete")
+        (view-name-for-model-action app-name model "do_delete")))
 
 (defun write-urls (spec)
   "Write urls.py"
@@ -393,6 +426,7 @@ def index(request):
 ~A Item Template
 
 <a href='../../edit/{{ item.id }}/'>Edit item</a>
+<a href='../../delete/{{ item.id }}/'>Delete item</a>
 
 {{ item }}
 
@@ -429,7 +463,15 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A Delete Template
+~A Confirm Delete
+
+{{ item }}
+
+<form action='../../do_delete/', method='POST'>
+    {% csrf_token %}
+    <input type='hidden' name='id' value='{{ item.id }}'>
+    <input type='submit' value='Yes, delete it'>
+</form>
 ~A"
                      (html-header spec model "Delete")
                      model-name
@@ -562,6 +604,4 @@ from .models import (~{~A, ~})
     (write-views spec)
     (write-templates spec)
     (write-index-template spec)
-
-    (format t "TODO: delete view, template for confirmation. should be similar to edit (navigate to id first)")
     t))
