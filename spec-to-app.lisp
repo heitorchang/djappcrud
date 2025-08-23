@@ -1,6 +1,36 @@
 (defparameter *output-base-dir* "/home/hcbel/code/djappcrud/out/")
 (defparameter *output-app-dir* "")
 
+(defparameter *html-header* "<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='utf-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+        <link rel='stylesheet' href='/static/css/style.css'>
+        <title>~A - ~A: ~A</title>
+    </head>
+    <body>
+~{~A~%~}
+")
+
+(defparameter *html-footer* "</body></html>")
+
+(defun header-link (spec model)
+  (format nil "<a href='/~A/~A/list/'>~A</a>"
+          (getf spec :app-name)
+          (string-downcase (getf model :model-name))
+          (getf model :model-name)))
+
+(defun html-header (spec model page-name)
+  (format nil *html-header*
+          (string-capitalize (getf spec :app-name))
+          (getf model :model-name)
+          page-name
+          (mapcar #'(lambda (model) (header-link spec model)) (getf spec :models))))
+
+(defun html-footer ()
+  (format nil *html-footer*))
+
 (defun convert-pairs (pairs)
   "Convert a list of properties given as a flat list, alternating keys and values (a 1 b 2 c 3)"
   (format nil "~{~A=~A,~}" pairs))
@@ -49,7 +79,10 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 
 (defun url-name (name action &optional (url-component ""))
   "Create URL components from the name"
-  (format nil "'~A_~A/~A', views.~A_~A, name='~A_~A'" name action url-component name action name action))
+  (format nil "'~A/~A/~A', views.~A_~A, name='~A_~A'"
+          (string-downcase name) action url-component
+          (string-downcase name) action
+          (string-downcase name) action))
 
 (defun crud-urls (name)
   "Generate URLs for the given name, returning a list of path components"
@@ -65,8 +98,8 @@ TODO: cond on action, each action has its own view action
   (format nil "def ~A_~A(request, ~{~A, ~}):
     return render(request, '~A/~A_~A.html')
 "
-          name action arg-list
-          app-name name action))
+          (string-downcase name) action arg-list
+          app-name (string-downcase name) action))
 
 (defun crud-views (app-name name)
   "Generate views for the given name, returning a list of function definitions"
@@ -98,7 +131,6 @@ urlpatterns = [
 
 (defun write-views (spec)
   "Write views.py"
-  (format t "TODO: Add an index view~%")
   (let ((app-name (getf spec :app-name))
         (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models))))
     (with-open-file (out (concatenate 'string *output-app-dir* "views.py")
@@ -109,32 +141,168 @@ from decimal import Decimal
 
 from django.shortcuts import render
 
+
+def index(request):
+    return render(request, '~A/index.html')
+
 ~{~{~A~%~}~}
 "
+                     (getf spec :app-name)
                      (mapcar #'(lambda (model-name) (crud-views app-name model-name)) model-names))
              out))))
 
-(defun write-template-for-model-action (templates-dir model-name action)
-  (with-open-file (out (concatenate 'string templates-dir model-name "_" action ".html")
-                       :direction :output
-                       :if-exists :supersede)
-    (princ (format nil "~A_~A" model-name action) out)))
+(defun write-list-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_list" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
 
-(defun write-templates-for-model (templates-dir model-name)
-  (write-template-for-model-action templates-dir model-name "list")
-  (write-template-for-model-action templates-dir model-name "item")
-  (write-template-for-model-action templates-dir model-name "add")
-  (write-template-for-model-action templates-dir model-name "do_add"))
+~A List Template
+
+<div>
+    <a href='../add/'>Add</a>
+</div>
+
+{% for item in ~As %}
+{{ item }}
+{% endfor %}
+
+~A
+"
+                     (html-header spec model "List")
+                     model-name
+                     (string-downcase model-name)
+                     (html-footer))
+             out))))
+
+(defun write-form-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_form" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~A Form Template
+
+~A"
+                     (html-header spec model "Add")
+                     model-name
+                     (html-footer))
+             out))))
+
+(defun write-add-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_add" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~A Add Template
+
+{% include '~A/~A_form.html' %}
+
+~A"
+                     (html-header spec model "Add")
+                     model-name
+                     (getf spec :app-name)
+                     (string-downcase model-name)
+                     (html-footer))
+             out))))
+
+(defun write-item-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_item" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~A Item Template
+~A"
+                     (html-header spec model "Item")
+                     model-name
+                     (html-footer))
+             out))))
+
+(defun write-edit-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_edit" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~A Edit Template
+~A"
+                     (html-header spec model "Edit")
+                     model-name
+                     (html-footer))
+             out))))
+
+(defun write-delete-template (templates-dir spec model)
+  (let ((model-name (getf model :model-name)))
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_delete" ".html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~A Delete Template
+~A"
+                     (html-header spec model "Delete")
+                     model-name
+                     (html-footer))
+             out))))
+
+(defun write-template-for-model-action (templates-dir spec model action)
+  (cond ((string= action "list") (write-list-template templates-dir spec model))
+        ((string= action "form") (write-form-template templates-dir spec model))
+        ((string= action "add") (write-add-template templates-dir spec model))
+        ((string= action "item") (write-item-template templates-dir spec model))
+        ((string= action "edit") (write-edit-template templates-dir spec model))
+        ((string= action "delete") (write-delete-template templates-dir spec model))
+        (t (format t "write-template-for-model-action: unknown action type: ~A" action))))
+
+(defun write-templates-for-model (templates-dir spec model)
+  (write-template-for-model-action templates-dir spec model "list")
+  (write-template-for-model-action templates-dir spec model "form")
+  (write-template-for-model-action templates-dir spec model "add")
+  (write-template-for-model-action templates-dir spec model "item")
+  (write-template-for-model-action templates-dir spec model "edit")
+  (write-template-for-model-action templates-dir spec model "delete"))
+
+(defun index-model-links (app-name models)
+  (mapcar #'(lambda (model)
+              (format nil "<div>
+    <a href='/~A/~A/list/'>~A</a>
+</div>
+"
+                      app-name
+                      (string-downcase (getf model :model-name))
+                      (getf model :model-name)))
+          models))
+
+(defun write-index-template (spec)
+  (let ((templates-dir (concatenate 'string *output-app-dir* "templates/" (getf spec :app-name) "/")))
+    (with-open-file (out (concatenate 'string templates-dir "index.html")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil "~A
+
+~{~A~}
+~A
+"
+                     (html-header spec `(:model-name ,(string-capitalize(getf spec :app-name))) "Home")
+                     (index-model-links (getf spec :app-name) (getf spec :models))
+                     (html-footer))
+             out))))
 
 (defun write-templates (spec)
   "Write HTML templates"
-  (format t "TODO: Add an index template~%")
   (let* ((app-name (getf spec :app-name))
-         (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models)))
+         (models (getf spec :models))
          (templates-dir (concatenate 'string *output-app-dir* "templates/" app-name "/")))
     (ensure-directories-exist templates-dir)
-    (dolist (model-name model-names)
-      (write-templates-for-model templates-dir model-name))))
+    (dolist (model models)
+      (write-templates-for-model templates-dir spec model))))
 
 (defun create-init-py ()
   (with-open-file (out (concatenate 'string *output-app-dir* "__init__.py")
@@ -189,21 +357,22 @@ from .models import (~{~A, ~})
 # Create your tests here.
 ") out)))
 
-(defun convert-spec (spec)
+(defun convert-spec (spec-filename)
   "Convert a full spec Lisp object"
-  (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
-  (ensure-directories-exist *output-app-dir*)
-  (create-init-py)
-  (create-migrations-init-py)
-  (write-apps spec)
-  (write-admin spec)
-  (write-models spec)
-  (write-urls spec)
-  (write-views spec)
-  (write-templates spec)
-  t)
+  (let ((spec (read-spec spec-filename)))
+    (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
+    (ensure-directories-exist *output-app-dir*)
+    (create-init-py)
+    (create-migrations-init-py)
+    (write-apps spec)
+    (write-admin spec)
+    (write-models spec)
+    (write-urls spec)
+    (write-views spec)
+    (write-templates spec)
+    (write-index-template spec)
+    t))
 
-(defun process-spec-file (spec-filename)
-  "Read spec-filename and process its Lisp object"
+(defun read-spec (spec-filename)
   (with-open-file (in spec-filename)
-    (convert-spec (read in))))
+    (read in)))
