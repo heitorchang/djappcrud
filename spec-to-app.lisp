@@ -17,16 +17,41 @@
 <div>
     <a href='/admin'>Admin</a>
 </div>
+
     </body>
 </html>")
 
+(defun convert-spec (spec-filename)
+  "Convert a spec Lisp object. The main function."
+
+  (let ((spec (read-spec spec-filename)))
+    (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
+    (ensure-directories-exist *output-app-dir*)
+    (create-init-py)
+    (create-migrations-init-py)
+    (write-apps spec)
+    (write-admin spec)
+    (write-models spec)
+    (write-urls spec)
+    (write-views spec)
+    (write-templates spec)
+    (write-index-template spec)
+    t))
+
+(defun read-spec (spec-filename)
+  "Load the Lisp spec object from the filename."
+  (with-open-file (in spec-filename)
+    (read in)))
+
 (defun header-link (spec model)
+  "Create an HTML link for the header."
   (format nil "<a href='/~A/~A/list/'>~A</a>"
           (getf spec :app-name)
           (string-downcase (getf model :model-name))
           (getf model :model-name)))
 
 (defun html-header (spec model page-name)
+  "Return the HTML header as a string."
   (format nil *html-header*
           (string-capitalize (getf spec :app-name))
           (getf model :model-name)
@@ -34,22 +59,23 @@
           (mapcar #'(lambda (model) (header-link spec model)) (getf spec :models))))
 
 (defun html-footer ()
+  "Return the HTML footer as a string."
   (format nil *html-footer*))
 
 (defun convert-pairs (pairs)
-  "Convert a list of properties given as a flat list, alternating keys and values (a 1 b 2 c 3)"
+  "Convert a list of properties given as a flat list, alternating keys and values (a 1 b 2 c 3)."
   (format nil "~{~A=~A,~}" pairs))
 
 (defun convert-model-field-value (field-value)
-  "Convert the value side of the field assignment"
+  "Convert the value side of the field assignment."
   (format nil "~A(~A)" (car field-value) (convert-pairs (cdr field-value))))
 
 (defun convert-model-field (field)
-  "Convert a model field assignment"
+  "Convert a model field assignment."
   (format nil "~A = ~A" (car field) (convert-model-field-value (cadr field))))
 
 (defun convert-model (model)
-  "Convert a model object to Python code (as a string)"
+  "Convert a model object to Python code (as a string)."
   (format nil "class ~A(Model):
     user = ForeignKey(User, blank=True, null=True, on_delete=SET_NULL)
 ~{    ~A~%~}
@@ -64,7 +90,7 @@
           (getf model :str)))
 
 (defun write-models (spec)
-  "Write models.py"
+  "Write models.py."
   (let ((models (getf spec :models)))
     (with-open-file (out (concatenate 'string *output-app-dir* "models.py")
                          :direction :output
@@ -85,14 +111,14 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
              out))))
 
 (defun url-name (model-name action &optional (url-component ""))
-  "Create URL components from the name"
+  "Create URL components from the model name and action."
   (format nil "'~A/~A/~A', views.~A_~A, name='~A_~A'"
           (string-downcase model-name) action url-component
           (string-downcase model-name) action
           (string-downcase model-name) action))
 
 (defun crud-urls (model-name)
-  "Generate URLs for the given name, returning a list of path components"
+  "Generate URLs for the given name, returning a list of path components."
   (list (url-name model-name "list")
         (url-name model-name "item" "<int:item_id>/")
         (url-name model-name "add")
@@ -103,6 +129,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (url-name model-name "do_delete")))
 
 (defun list-view (app-name model)
+  "View function to display a list of items."
   (let ((action "list")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -114,6 +141,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name) action)))
 
 (defun item-view (app-name model)
+  "View function to display an item's details."
   (let ((action "item")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -125,18 +153,22 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name) action)))
 
 (defun view-foreign-key (foreign-key)
+  "Definition of an individual foreign key."
   (let ((model-name (nth 2 (cadr foreign-key))))
     (format nil "~A = models.~A.objects.filter(user=request.user)" (car foreign-key) model-name)))
 
 (defun view-foreign-keys (fields)
+  "Definition of foreign keys."
   (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
     (format nil "~{    ~A~%~}" (mapcar #'view-foreign-key foreign-keys))))
 
 (defun context-foreign-keys (fields)
+  "Helper to populate template context with foreign keys."
   (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
     (format nil "{~{~A~}}" (mapcar #'(lambda (foreign-key) (format nil "'~A': ~A, " (car foreign-key) (car foreign-key))) foreign-keys))))
 
 (defun add-view (app-name model)
+  "View function to show the add form."
   (let ((action "add")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -149,21 +181,24 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             (context-foreign-keys (getf model :fields)))))
 
 (defun form-post-request-item (model-field)
+  "Object or value to be read from POST data."
   (let ((foreign-key-model-name (nth 2 (cadr model-field)))
         (field-type (caadr model-field)))
     (cond ((string= field-type "ForeignKey")
            (format nil "~A = models.~A.objects.get(user=request.user, pk=request.POST['~A'])"
                    (car model-field) foreign-key-model-name (car model-field)))
           (t (format nil "~A = request.POST['~A']"
-                   (car model-field)
-                   (car model-field))))))
+                     (car model-field)
+                     (car model-field))))))
 
 (defun do-add-view-field-pairs (model-field)
+  "Assignment of a value to an argument."
   (format nil "~A=~A,"
           (car model-field)
           (car model-field)))
 
 (defun do-add-view (app-name model)
+  "View function that creates an item."
   (let ((action "do_add")
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
@@ -182,6 +217,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name))))
 
 (defun edit-view (app-name model)
+  "View function to show edit form."
   (let ((action "edit")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -198,11 +234,13 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name) action)))
 
 (defun do-edit-view-field-pairs (model-field)
+  "Assignment of a value to an item's field."
   (format nil "item.~A = ~A"
           (car model-field)
           (car model-field)))
 
 (defun do-edit-view (app-name model)
+  "View function that saves an edit of an item."
   (let ((action "do_edit")
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
@@ -225,6 +263,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name))))
 
 (defun delete-view (app-name model)
+  "Delete confirmation view."
   (let ((action "delete")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -236,6 +275,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             app-name (string-downcase model-name) action)))
 
 (defun do-delete-view (app-name model)
+  "View function that deletes an item."
   (let ((action "do_delete")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -263,7 +303,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         ((string= action "do_delete") (do-delete-view app-name model))))
 
 (defun crud-views (app-name model)
-  "Generate views for the given name, returning a list of function definitions"
+  "Generate views for the given name, returning a list of function definitions."
   (list (view-name-for-model-action app-name model "list")
         (view-name-for-model-action app-name model "item")
         (view-name-for-model-action app-name model "add")
@@ -274,7 +314,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (view-name-for-model-action app-name model "do_delete")))
 
 (defun write-urls (spec)
-  "Write urls.py"
+  "Write urls.py."
   (let ((app-name (getf spec :app-name))
         (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models))))
     (with-open-file (out (concatenate 'string *output-app-dir* "urls.py")
@@ -295,7 +335,7 @@ urlpatterns = [
              out))))
 
 (defun write-views (spec)
-  "Write views.py"
+  "Write views.py."
   (let ((app-name (getf spec :app-name)))
     (with-open-file (out (concatenate 'string *output-app-dir* "views.py")
                          :direction :output
@@ -321,6 +361,7 @@ def index(request):
              out))))
 
 (defun write-list-template (templates-dir spec model)
+  "Write model_name_list.html."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_list" ".html")
                          :direction :output
@@ -345,6 +386,7 @@ def index(request):
              out))))
 
 (defun form-field (model-field)
+  "Return an appropriate HTML form element for the given model-field."
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
     (format nil "<div>
@@ -373,6 +415,7 @@ def index(request):
                        (format nil "~A <input name='~A'>" field-name field-name)))))))
 
 (defun write-form-template (templates-dir model form-action)
+  "Write an item form appropriate for the form-action."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_" form-action "_form.html")
                          :direction :output
@@ -396,6 +439,7 @@ def index(request):
              out))))
 
 (defun write-add-template (templates-dir spec model)
+  "Write model_name_add.html."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_add" ".html")
                          :direction :output
@@ -414,9 +458,11 @@ def index(request):
              out))))
 
 (defun item-template-field (field)
+  "Return the field of a generic item."
   (format nil "{{ item.~A }}" (car field)))
 
 (defun write-item-template (templates-dir spec model)
+  "Write model_name_item.html."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_item" ".html")
                          :direction :output
@@ -439,6 +485,7 @@ def index(request):
              out))))
 
 (defun write-edit-template (templates-dir spec model)
+  "Write model_name_edit.html."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_edit" ".html")
                          :direction :output
@@ -457,6 +504,7 @@ def index(request):
              out))))
 
 (defun write-delete-template (templates-dir spec model)
+  "Write model_name_delete.html."
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_delete" ".html")
                          :direction :output
@@ -479,6 +527,7 @@ def index(request):
              out))))
 
 (defun write-template-for-model-action (templates-dir spec model action)
+  "Call specific template-writing function based on the given action."
   (cond ((string= action "list") (write-list-template templates-dir spec model))
         ((string= action "add_form") (write-form-template templates-dir model "do_add"))
         ((string= action "add") (write-add-template templates-dir spec model))
@@ -489,6 +538,7 @@ def index(request):
         (t (format t "write-template-for-model-action: unknown action type: ~A" action))))
 
 (defun write-templates-for-model (templates-dir spec model)
+  "Call write-template-for-model-action with given actions."
   (write-template-for-model-action templates-dir spec model "list")
   (write-template-for-model-action templates-dir spec model "add_form")
   (write-template-for-model-action templates-dir spec model "add")
@@ -498,6 +548,7 @@ def index(request):
   (write-template-for-model-action templates-dir spec model "delete"))
 
 (defun index-model-links (app-name models)
+  "Links to the list view of each model."
   (mapcar #'(lambda (model)
               (format nil "<div>
     <a href='/~A/~A/list/'>~A</a>
@@ -509,6 +560,7 @@ def index(request):
           models))
 
 (defun write-index-template (spec)
+  "Write templates/app_name/index.html."
   (let ((templates-dir (concatenate 'string *output-app-dir* "templates/" (getf spec :app-name) "/")))
     (with-open-file (out (concatenate 'string templates-dir "index.html")
                          :direction :output
@@ -524,7 +576,7 @@ def index(request):
              out))))
 
 (defun write-templates (spec)
-  "Write HTML templates"
+  "Write HTML templates."
   (let* ((app-name (getf spec :app-name))
          (models (getf spec :models))
          (templates-dir (concatenate 'string *output-app-dir* "templates/" app-name "/")))
@@ -533,12 +585,14 @@ def index(request):
       (write-templates-for-model templates-dir spec model))))
 
 (defun create-init-py ()
+  "Write __init__.py."
   (with-open-file (out (concatenate 'string *output-app-dir* "__init__.py")
                        :direction :output
                        :if-exists :supersede)
     (princ "# __init__" out)))
 
 (defun create-migrations-init-py ()
+  "Write migrations/__init__.py."
   (let ((migrations-dir (concatenate 'string *output-app-dir* "migrations/")))
     (ensure-directories-exist migrations-dir)
     (with-open-file (out (concatenate 'string migrations-dir "__init__.py")
@@ -547,6 +601,7 @@ def index(request):
       (princ "# __init__" out))))
 
 (defun write-apps (spec)
+  "Write apps.py"
   (with-open-file (out (concatenate 'string *output-app-dir* "apps.py")
                        :direction :output
                        :if-exists :supersede)
@@ -562,6 +617,7 @@ class ~AConfig(AppConfig):
            out)))
 
 (defun write-admin (spec)
+  "Write admin.py."
   (let ((model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models))))
     (with-open-file (out (concatenate 'string *output-app-dir* "admin.py")
                          :direction :output
@@ -577,31 +633,11 @@ from .models import (~{~A, ~})
              out))))
 
 (defun write-tests ()
+  "Write tests.py."
   (with-open-file (out (concatenate 'string *output-app-dir* "tests.py")
-                         :direction :output
-                         :if-exists :supersede)
-      (princ (format nil "from django.test import TestCase
+                       :direction :output
+                       :if-exists :supersede)
+    (princ (format nil "from django.test import TestCase
 
 # Create your tests here.
 ") out)))
-
-(defun read-spec (spec-filename)
-  (with-open-file (in spec-filename)
-    (read in)))
-
-(defun convert-spec (spec-filename)
-  "Convert a full spec Lisp object"
-
-  (let ((spec (read-spec spec-filename)))
-    (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
-    (ensure-directories-exist *output-app-dir*)
-    (create-init-py)
-    (create-migrations-init-py)
-    (write-apps spec)
-    (write-admin spec)
-    (write-models spec)
-    (write-urls spec)
-    (write-views spec)
-    (write-templates spec)
-    (write-index-template spec)
-    t))
