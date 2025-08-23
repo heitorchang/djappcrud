@@ -46,6 +46,7 @@
 (defun convert-model (model)
   "Convert a model object to Python code (as a string)"
   (format nil "class ~A(Model):
+    user = ForeignKey(User, blank=True, null=True, on_delete=SET_NULL)
 ~{    ~A~%~}
     class Meta:
         ordering = ~A
@@ -68,6 +69,7 @@
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.db.models import Model, ForeignKey, CASCADE, SET_NULL
 from django.db.models import CharField, TextField, IntegerField, FloatField, DecimalField, TextField, ImageField, DateField, DateTimeField, BooleanField
 
@@ -77,36 +79,88 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
                      (mapcar #'convert-model models))
              out))))
 
-(defun url-name (name action &optional (url-component ""))
+(defun url-name (model-name action &optional (url-component ""))
   "Create URL components from the name"
   (format nil "'~A/~A/~A', views.~A_~A, name='~A_~A'"
-          (string-downcase name) action url-component
-          (string-downcase name) action
-          (string-downcase name) action))
+          (string-downcase model-name) action url-component
+          (string-downcase model-name) action
+          (string-downcase model-name) action))
 
-(defun crud-urls (name)
+(defun crud-urls (model-name)
   "Generate URLs for the given name, returning a list of path components"
-  (list (url-name name "list")
-        (url-name name "item" "<int:item_id>/")
-        (url-name name "add")
-        (url-name name "do_add")))
+  (list (url-name model-name "list")
+        (url-name model-name "item" "<int:item_id>/")
+        (url-name model-name "add")
+        (url-name model-name "do_add")))
 
-(defun view-name (app-name name action &optional arg-list)
-  "Create a view function definition.
-TODO: cond on action, each action has its own view action
-"
-  (format nil "def ~A_~A(request, ~{~A, ~}):
+(defun list-view (app-name model)
+  (let ((action "list")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request):
     return render(request, '~A/~A_~A.html')
 "
-          (string-downcase name) action arg-list
-          app-name (string-downcase name) action))
+            (string-downcase model-name) action
+            app-name (string-downcase model-name) action)))
 
-(defun crud-views (app-name name)
+(defun item-view (app-name model)
+  (let ((action "item")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request, item_id):
+    return render(request, '~A/~A_~A.html')
+"
+            (string-downcase model-name) action
+            app-name (string-downcase model-name) action)))
+
+(defun add-view (app-name model)
+  (let ((action "add")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request):
+    return render(request, '~A/~A_form.html')
+"
+            (string-downcase model-name) action
+            app-name (string-downcase model-name))))
+
+(defun do-add-view-post-request-item (model-field)
+  (format nil "~A = request.POST['~A']"
+          (car model-field)
+          (car model-field)))
+
+(defun do-add-view-field-pairs (model-field)
+  (format nil "~A=~A,"
+          (car model-field)
+          (car model-field)))
+
+(defun do-add-view (app-name model)
+  (let ((action "do_add")
+        (model-name (getf model :model-name))
+        (model-fields (getf model :fields)))
+    (format nil "def ~A_~A(request):
+~{    ~A~%~}
+    models.~A.objects.create(
+        user = request.user,
+~{        ~A~%~}
+    )
+    return render(request, '~A/~A_list.html')
+"
+            (string-downcase model-name) action
+            (mapcar #'do-add-view-post-request-item model-fields)
+            model-name
+            (mapcar #'do-add-view-field-pairs model-fields)
+            app-name (string-downcase model-name))))
+
+(defun view-name-for-model-action (app-name model action)
+  "Create a view function definition."
+  (cond ((string= action "list") (list-view app-name model))
+        ((string= action "item") (item-view app-name model))
+        ((string= action "add") (add-view app-name model))
+        ((string= action "do_add") (do-add-view app-name model))))
+
+(defun crud-views (app-name model)
   "Generate views for the given name, returning a list of function definitions"
-  (list (view-name app-name name "list")
-        (view-name app-name name "item" '("item_id"))
-        (view-name app-name name "add")
-        (view-name app-name name "do_add")))
+  (list (view-name-for-model-action app-name model "list")
+        (view-name-for-model-action app-name model "item")
+        (view-name-for-model-action app-name model "add")
+        (view-name-for-model-action app-name model "do_add")))
 
 (defun write-urls (spec)
   "Write urls.py"
@@ -131,8 +185,7 @@ urlpatterns = [
 
 (defun write-views (spec)
   "Write views.py"
-  (let ((app-name (getf spec :app-name))
-        (model-names (mapcar #'(lambda (model) (getf model :model-name)) (getf spec :models))))
+  (let ((app-name (getf spec :app-name)))
     (with-open-file (out (concatenate 'string *output-app-dir* "views.py")
                          :direction :output
                          :if-exists :supersede)
@@ -141,6 +194,8 @@ from decimal import Decimal
 
 from django.shortcuts import render
 
+from . import models
+
 
 def index(request):
     return render(request, '~A/index.html')
@@ -148,7 +203,7 @@ def index(request):
 ~{~{~A~%~}~}
 "
                      (getf spec :app-name)
-                     (mapcar #'(lambda (model-name) (crud-views app-name model-name)) model-names))
+                     (mapcar #'(lambda (model) (crud-views app-name model)) (getf spec :models)))
              out))))
 
 (defun write-list-template (templates-dir spec model)
@@ -176,19 +231,32 @@ def index(request):
                      (html-footer))
              out))))
 
-(defun write-form-template (templates-dir spec model)
+(defun form-field (model-field)
+  (format nil "<div>
+    ~A <input name='~A'>
+</div>
+
+"
+          (car model-field)
+          (car model-field)))
+
+(defun write-form-template (templates-dir model)
   (let ((model-name (getf model :model-name)))
     (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_form" ".html")
                          :direction :output
                          :if-exists :supersede)
-      (princ (format nil "~A
+      (princ (format nil "<!-- ~A form -->
+<form action='../do_add/' method='POST'>
+    {% csrf_token %}
 
-~A Form Template
+~{~A~}
 
-~A"
-                     (html-header spec model "Add")
+<input type='submit'>
+
+</form>
+"
                      model-name
-                     (html-footer))
+                     (mapcar #'form-field (getf model :fields)))
              out))))
 
 (defun write-add-template (templates-dir spec model)
@@ -254,7 +322,7 @@ def index(request):
 
 (defun write-template-for-model-action (templates-dir spec model action)
   (cond ((string= action "list") (write-list-template templates-dir spec model))
-        ((string= action "form") (write-form-template templates-dir spec model))
+        ((string= action "form") (write-form-template templates-dir model))
         ((string= action "add") (write-add-template templates-dir spec model))
         ((string= action "item") (write-item-template templates-dir spec model))
         ((string= action "edit") (write-edit-template templates-dir spec model))
