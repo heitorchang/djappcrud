@@ -13,7 +13,12 @@
 ~{~A~%~}
 ")
 
-(defparameter *html-footer* "</body></html>")
+(defparameter *html-footer* "
+<div>
+    <a href='/admin'>Admin</a>
+</div>
+    </body>
+</html>")
 
 (defun header-link (spec model)
   (format nil "<a href='/~A/~A/list/'>~A</a>"
@@ -91,39 +96,65 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
   (list (url-name model-name "list")
         (url-name model-name "item" "<int:item_id>/")
         (url-name model-name "add")
-        (url-name model-name "do_add")))
+        (url-name model-name "do_add")
+        (url-name model-name "edit" "<int:item_id>/")
+        (url-name model-name "do_edit")))
 
 (defun list-view (app-name model)
   (let ((action "list")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
-    return render(request, '~A/~A_~A.html')
+    items = models.~A.objects.filter(user=request.user)
+    return render(request, '~A/~A_~A.html', {'items': items})
 "
             (string-downcase model-name) action
+            model-name
             app-name (string-downcase model-name) action)))
 
 (defun item-view (app-name model)
   (let ((action "item")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
-    return render(request, '~A/~A_~A.html')
+    item = models.~A.objects.get(user=request.user, pk=item_id)
+    return render(request, '~A/~A_~A.html', {'item': item})
 "
             (string-downcase model-name) action
+            model-name
             app-name (string-downcase model-name) action)))
+
+(defun view-foreign-key (foreign-key)
+  (let ((model-name (nth 2 (cadr foreign-key))))
+    (format nil "~A = models.~A.objects.filter(user=request.user)" (car foreign-key) model-name)))
+
+(defun view-foreign-keys (fields)
+  (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
+    (format nil "~{    ~A~%~}" (mapcar #'view-foreign-key foreign-keys))))
+
+(defun context-foreign-keys (fields)
+  (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
+    (format nil "{~{~A~}}" (mapcar #'(lambda (foreign-key) (format nil "'~A': ~A, " (car foreign-key) (car foreign-key))) foreign-keys))))
 
 (defun add-view (app-name model)
   (let ((action "add")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
-    return render(request, '~A/~A_form.html')
+~A
+    return render(request, '~A/~A_add.html', ~A)
 "
             (string-downcase model-name) action
-            app-name (string-downcase model-name))))
+            (view-foreign-keys (getf model :fields))
+            app-name (string-downcase model-name)
+            (context-foreign-keys (getf model :fields)))))
 
-(defun do-add-view-post-request-item (model-field)
-  (format nil "~A = request.POST['~A']"
-          (car model-field)
-          (car model-field)))
+(defun form-post-request-item (model-field)
+  (let ((foreign-key-model-name (nth 2 (cadr model-field)))
+        (field-type (caadr model-field)))
+    (cond ((string= field-type "ForeignKey")
+           (format nil "~A = models.~A.objects.get(user=request.user, pk=request.POST['~A'])"
+                   (car model-field) foreign-key-model-name (car model-field)))
+          (t (format nil "~A = request.POST['~A']"
+                   (car model-field)
+                   (car model-field))))))
 
 (defun do-add-view-field-pairs (model-field)
   (format nil "~A=~A,"
@@ -140,12 +171,55 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         user = request.user,
 ~{        ~A~%~}
     )
-    return render(request, '~A/~A_list.html')
+    return redirect('~A:~A_list')
 "
             (string-downcase model-name) action
-            (mapcar #'do-add-view-post-request-item model-fields)
+            (mapcar #'form-post-request-item model-fields)
             model-name
             (mapcar #'do-add-view-field-pairs model-fields)
+            app-name (string-downcase model-name))))
+
+(defun edit-view (app-name model)
+  (let ((action "edit")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request, item_id):
+    item = models.~A.objects.get(user=request.user, pk=item_id)
+~A
+    context = ~A
+    context.update({'item': item})
+    return render(request, '~A/~A_~A.html', context)
+"
+            (string-downcase model-name) action
+            model-name
+            (view-foreign-keys (getf model :fields))
+            (context-foreign-keys (getf model :fields))
+            app-name (string-downcase model-name) action)))
+
+(defun do-edit-view-field-pairs (model-field)
+  (format nil "item.~A = ~A"
+          (car model-field)
+          (car model-field)))
+
+(defun do-edit-view (app-name model)
+  (let ((action "do_edit")
+        (model-name (getf model :model-name))
+        (model-fields (getf model :fields)))
+    (format nil "def ~A_~A(request):
+~{    ~A~%~}
+    item = models.~A.objects.get(
+        user = request.user,
+        pk = request.POST['id']
+    )
+
+~{    ~A~%~}
+    item.save()
+
+    return redirect('~A:~A_list')
+"
+            (string-downcase model-name) action
+            (mapcar #'form-post-request-item model-fields)
+            model-name
+            (mapcar #'do-edit-view-field-pairs model-fields)
             app-name (string-downcase model-name))))
 
 (defun view-name-for-model-action (app-name model action)
@@ -153,14 +227,18 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
   (cond ((string= action "list") (list-view app-name model))
         ((string= action "item") (item-view app-name model))
         ((string= action "add") (add-view app-name model))
-        ((string= action "do_add") (do-add-view app-name model))))
+        ((string= action "do_add") (do-add-view app-name model))
+        ((string= action "edit") (edit-view app-name model))
+        ((string= action "do_edit") (do-edit-view app-name model))))
 
 (defun crud-views (app-name model)
   "Generate views for the given name, returning a list of function definitions"
   (list (view-name-for-model-action app-name model "list")
         (view-name-for-model-action app-name model "item")
         (view-name-for-model-action app-name model "add")
-        (view-name-for-model-action app-name model "do_add")))
+        (view-name-for-model-action app-name model "do_add")
+        (view-name-for-model-action app-name model "edit")
+        (view-name-for-model-action app-name model "do_edit")))
 
 (defun write-urls (spec)
   "Write urls.py"
@@ -192,15 +270,18 @@ urlpatterns = [
       (princ (format nil "from datetime import datetime, date, timedelta
 from decimal import Decimal
 
-from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
 
 from . import models
 
 
+@login_required
 def index(request):
     return render(request, '~A/index.html')
 
-~{~{~A~%~}~}
+~{~{@login_required
+~A~%~}~}
 "
                      (getf spec :app-name)
                      (mapcar #'(lambda (model) (crud-views app-name model)) (getf spec :models)))
@@ -219,35 +300,54 @@ def index(request):
     <a href='../add/'>Add</a>
 </div>
 
-{% for item in ~As %}
-{{ item }}
+{% for item in items %}
+    <a href='../item/{{ item.id }}/'>{{ item }}</a>
 {% endfor %}
 
 ~A
 "
                      (html-header spec model "List")
                      model-name
-                     (string-downcase model-name)
                      (html-footer))
              out))))
 
 (defun form-field (model-field)
-  (format nil "<div>
-    ~A <input name='~A'>
+  (let ((field-name (car model-field))
+        (field-type (caadr model-field)))
+    (format nil "<div>
+    ~A
 </div>
 
 "
-          (car model-field)
-          (car model-field)))
+            (cond ((string= field-type "CharField")
+                   (format nil "~A <input name='~A' value='{{ item.~A }}'>" field-name field-name field-name))
+                  ((string= field-type "DateTimeField")
+                   (format nil "~A <input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}'>" field-name field-name field-name))
+                  ((string= field-type "IntegerField")
+                   (format nil "~A <input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name field-name))
+                  ((string= field-type "ForeignKey")
+                   (format nil "~A
+<select name='~A'>
+{% for row in ~A %}
+    <option value='{{ row.id }}'{% if row.id == item.~A.id %} selected{% endif %}>
+        {{ row }}
+    </option>
+{% endfor %}
+</select>
+" field-name field-name field-name field-name))
+                  (t (progn
+                       (format t "form-field: warning: field-type ~A not defined yet.~%" field-type)
+                       (format nil "~A <input name='~A'>" field-name field-name)))))))
 
-(defun write-form-template (templates-dir model)
+(defun write-form-template (templates-dir model form-action)
   (let ((model-name (getf model :model-name)))
-    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_form" ".html")
+    (with-open-file (out (concatenate 'string templates-dir (string-downcase model-name) "_" form-action "_form.html")
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "<!-- ~A form -->
-<form action='../do_add/' method='POST'>
+<form action='~A/~A/' method='POST'>
     {% csrf_token %}
+    ~A
 
 ~{~A~}
 
@@ -256,6 +356,9 @@ def index(request):
 </form>
 "
                      model-name
+                     (if (string= form-action "do_edit") "../.." "..")
+                     form-action
+                     (if (string= form-action "do_edit") (format nil "<input type='hidden' name='id' value='{{ item.id }}'>") "")
                      (mapcar #'form-field (getf model :fields)))
              out))))
 
@@ -268,15 +371,17 @@ def index(request):
 
 ~A Add Template
 
-{% include '~A/~A_form.html' %}
+{% include '~A/~A_do_add_form.html' %}
 
 ~A"
                      (html-header spec model "Add")
                      model-name
-                     (getf spec :app-name)
-                     (string-downcase model-name)
+                     (getf spec :app-name) (string-downcase model-name)
                      (html-footer))
              out))))
+
+(defun item-template-field (field)
+  (format nil "{{ item.~A }}" (car field)))
 
 (defun write-item-template (templates-dir spec model)
   (let ((model-name (getf model :model-name)))
@@ -286,9 +391,16 @@ def index(request):
       (princ (format nil "~A
 
 ~A Item Template
+
+<a href='../../edit/{{ item.id }}/'>Edit item</a>
+
+{{ item }}
+
+~{~A~%~}
 ~A"
                      (html-header spec model "Item")
                      model-name
+                     (mapcar #'item-template-field (getf model :fields))
                      (html-footer))
              out))))
 
@@ -300,9 +412,13 @@ def index(request):
       (princ (format nil "~A
 
 ~A Edit Template
+
+{% include '~A/~A_do_edit_form.html' %}
+
 ~A"
                      (html-header spec model "Edit")
                      model-name
+                     (getf spec :app-name) (string-downcase model-name)
                      (html-footer))
              out))))
 
@@ -322,18 +438,20 @@ def index(request):
 
 (defun write-template-for-model-action (templates-dir spec model action)
   (cond ((string= action "list") (write-list-template templates-dir spec model))
-        ((string= action "form") (write-form-template templates-dir model))
+        ((string= action "add_form") (write-form-template templates-dir model "do_add"))
         ((string= action "add") (write-add-template templates-dir spec model))
         ((string= action "item") (write-item-template templates-dir spec model))
+        ((string= action "edit_form") (write-form-template templates-dir model "do_edit"))
         ((string= action "edit") (write-edit-template templates-dir spec model))
         ((string= action "delete") (write-delete-template templates-dir spec model))
         (t (format t "write-template-for-model-action: unknown action type: ~A" action))))
 
 (defun write-templates-for-model (templates-dir spec model)
   (write-template-for-model-action templates-dir spec model "list")
-  (write-template-for-model-action templates-dir spec model "form")
+  (write-template-for-model-action templates-dir spec model "add_form")
   (write-template-for-model-action templates-dir spec model "add")
   (write-template-for-model-action templates-dir spec model "item")
+  (write-template-for-model-action templates-dir spec model "edit_form")
   (write-template-for-model-action templates-dir spec model "edit")
   (write-template-for-model-action templates-dir spec model "delete"))
 
@@ -425,8 +543,13 @@ from .models import (~{~A, ~})
 # Create your tests here.
 ") out)))
 
+(defun read-spec (spec-filename)
+  (with-open-file (in spec-filename)
+    (read in)))
+
 (defun convert-spec (spec-filename)
   "Convert a full spec Lisp object"
+
   (let ((spec (read-spec spec-filename)))
     (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
     (ensure-directories-exist *output-app-dir*)
@@ -439,8 +562,6 @@ from .models import (~{~A, ~})
     (write-views spec)
     (write-templates spec)
     (write-index-template spec)
-    t))
 
-(defun read-spec (spec-filename)
-  (with-open-file (in spec-filename)
-    (read in)))
+    (format t "TODO: delete view, template for confirmation. should be similar to edit (navigate to id first)")
+    t))
