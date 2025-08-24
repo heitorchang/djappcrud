@@ -533,7 +533,7 @@ def index(request):
                      (html-footer))
              out))))
 
-(defun form-field (model-field)
+(defun form-field (model-field index)
   "Return an appropriate HTML form element for the given model-field."
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
@@ -545,13 +545,13 @@ def index(request):
 "
             field-name
             (cond ((string= field-type "CharField")
-                   (format nil "<input name='~A' value='{{ item.~A }}'{% if max_length.~A %} maxlength='{{ max_length.~A }}'{% endif %} required>" field-name field-name field-name field-name))
+                   (format nil "<input name='~A' value='{{ item.~A }}'{% if max_length.~A %} maxlength='{{ max_length.~A }}'{% endif %}~A>" field-name field-name field-name field-name (if (= index 0) " autofocus" "")))
                   ((string= field-type "DateTimeField")
-                   (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}' required>" field-name field-name))
+                   (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}'>" field-name field-name))
                   ((string= field-type "IntegerField")
-                   (format nil "<input name='~A' type='number' value='{{ item.~A }}' required>" field-name field-name))
+                   (format nil "<input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name))
                   ((string= field-type "TextField")
-                   (format nil "<textarea name='~A' rows='12' cols='80' required>{{ item.~A }}</textarea>" field-name field-name))
+                   (format nil "<textarea name='~A' rows='12' cols='80'>{{ item.~A }}</textarea>" field-name field-name))
                   ((string= field-type "ForeignKey")
                    (format nil "
 <select name='~A'>
@@ -587,7 +587,7 @@ def index(request):
                      (if (string= form-action "edit") "../.." "..")
                      form-action
                      (if (string= form-action "edit") (format nil "<input type='hidden' name='id' value='{{ item.id }}'>") "")
-                     (mapcar #'form-field (getf model :fields)))
+                     (mapcar #'form-field (getf model :fields) (loop for i from 0 below (length (getf model :fields)) collect i)))
              out))))
 
 (defun write-add-template (templates-dir spec model)
