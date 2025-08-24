@@ -93,6 +93,11 @@ div.header {
   line-height: 2rem;
 }
 
+.list-link {
+  margin: 1.2rem;
+  font-size: 1.2rem;
+}
+
 div.footer {
   margin: 1.5rem 0.5rem;
   color: DarkGrey;
@@ -239,10 +244,13 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
     item = models.~A.objects.get(user=request.user, pk=item_id)
-    return render(request, '~A/~A_~A.html', {'item': item})
+    context = {'item': item}
+    context.update({'help_text': ~A})
+    return render(request, '~A/~A_~A.html', context)
 "
             (string-downcase model-name) action
             model-name
+            (context-help-text (getf model :fields))
             app-name (string-downcase model-name) action)))
 
 (defun view-foreign-key (foreign-key)
@@ -266,7 +274,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
                                              (let ((attributes (cadr field)))
                                                (member "help_text" attributes :test #'equal)))
                                          fields)))
-    (format nil "{~{~{'~A': ~A~}~}}"
+    (format nil "{~{~{'~A': ~A, ~}~}}"
             (mapcar #'(lambda (field)
                         (let* ((field-name (car field))
                                (attributes (cadr field))
@@ -522,13 +530,12 @@ def index(request):
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
     (format nil "<div>
-    <p>~A</p>
     <p class='help-text'>{{ help_text.~A }}</p>
     ~A
 </div>
 
 "
-            field-name field-name
+            field-name
             (cond ((string= field-type "CharField")
                    (format nil "<input name='~A' value='{{ item.~A }}'{% if max_length.~A %} maxlength='{{ max_length.~A }}'{% endif %} required>" field-name field-name field-name field-name))
                   ((string= field-type "DateTimeField")
@@ -594,7 +601,7 @@ def index(request):
 
 (defun item-template-field (field)
   "Return the field of a generic item."
-  (format nil "<p><strong>~A</strong>: {{ item.~A }}</p>" (car field) (car field)))
+  (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field)))
 
 (defun write-item-template (templates-dir spec model)
   "Write model_name_item.html."
@@ -607,6 +614,7 @@ def index(request):
 <h3>~A</h3>
 
 <div class='actions'>
+  <a class='link' href='../../add/'>Add</a>
   <a class='link' href='../../edit/{{ item.id }}/'>Edit item</a>
   <a class='link' href='../../delete/{{ item.id }}/'>Delete item</a>
 </div>
