@@ -337,12 +337,11 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
           ((string= field-type "ImageField")
            (format nil "~A = request.FILES['~A']
     file_extension = os.path.splitext(~A.name)[1]
-    unique_filename = f'~A{file_extension}'
+    unique_filename = f'{uuid.uuid4()}{file_extension}'
     ~A = default_storage.save(unique_filename, ContentFile(~A.read()))
 "
                    model-name model-name
                    model-name
-                   (format nil "~A" (get-universal-time))
                    model-name model-name))
           (t (format nil "~A = request.POST['~A']"
                      model-name model-name)))))
@@ -502,6 +501,7 @@ urlpatterns = [
                          :if-exists :supersede)
       (princ (format nil "from datetime import datetime, date, timedelta
 import os
+import uuid
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
