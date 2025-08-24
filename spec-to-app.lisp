@@ -46,6 +46,11 @@ h3 {
   padding: 0;
 }
 
+h4 {
+  margin: 1rem 1.5rem;
+  padding: 0;
+}
+
 ul {
   list-style-type: circle;
 }
@@ -85,6 +90,7 @@ div.header {
 .content ul li .link {
   background-color: AliceBlue;
   color: MidnightBlue;
+  line-height: 2rem;
 }
 
 div.footer {
@@ -96,7 +102,7 @@ div.footer {
   color: DarkGrey;
 }
 
-.form {
+.item-form {
   background-color: PapayaWhip;
   padding: 0.5rem;
 }
@@ -109,8 +115,23 @@ input[type=submit] {
   border-radius: 0.15rem;
 }
 
-.list-actions {
+.actions {
   padding-left: 1.5rem;
+}
+
+.item-form p {
+  margin: 0.3rem 0;
+  padding: 0;
+}
+
+.item-form .help-text {
+  font-style: italic;
+  color: DarkSlateGrey;
+}
+
+.item-details {
+  padding: 0.5rem;
+  background-color: PapayaWhip;
 }
 ")
 
@@ -253,6 +274,20 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
                           (list field-name (nth (1+ help-index) attributes))))
                     fields-with-help))))
 
+(defun context-max-length (fields)
+  "Helper to read max_length values and generate a dict."
+  (let ((fields-with-help (remove-if-not #'(lambda (field)
+                                             (let ((attributes (cadr field)))
+                                               (member "max_length" attributes :test #'equal)))
+                                         fields)))
+    (format nil "{~{~{'~A': ~A~}~}}"
+            (mapcar #'(lambda (field)
+                        (let* ((field-name (car field))
+                               (attributes (cadr field))
+                               (help-index (position "max_length" attributes :test #'equal)))
+                          (list field-name (nth (1+ help-index) attributes))))
+                    fields-with-help))))
+
 (defun add-view (app-name model)
   "View function to show the add form."
   (let ((action "add")
@@ -261,12 +296,14 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 ~A
     context = ~A
     context.update({'help_text': ~A})
+    context.update({'max_length': ~A})
     return render(request, '~A/~A_add.html', context)
 "
             (string-downcase model-name) action
             (view-foreign-keys (getf model :fields))
             (context-foreign-keys (getf model :fields))
             (context-help-text (getf model :fields))
+            (context-max-length (getf model :fields))
             app-name (string-downcase model-name))))
 
 (defun form-post-request-item (model-field)
@@ -315,6 +352,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     context = ~A
     context.update({'item': item})
     context.update({'help_text': ~A})
+    context.update({'max_length': ~A})
     return render(request, '~A/~A_~A.html', context)
 "
             (string-downcase model-name) action
@@ -322,6 +360,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             (view-foreign-keys (getf model :fields))
             (context-foreign-keys (getf model :fields))
             (context-help-text (getf model :fields))
+            (context-max-length (getf model :fields))
             app-name (string-downcase model-name) action)))
 
 (defun do-edit-view-field-pairs (model-field)
@@ -461,7 +500,7 @@ def index(request):
 
 <h3>~A</h3>
 
-<div class='list-actions'>
+<div class='actions'>
     <a class='link' href='../add/'>Add</a>
 </div>
 
@@ -483,17 +522,19 @@ def index(request):
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
     (format nil "<div>
-    ~A {{ help_text.~A }} ~A
+    <p>~A</p>
+    <p class='help-text'>{{ help_text.~A }}</p>
+    ~A
 </div>
 
 "
             field-name field-name
             (cond ((string= field-type "CharField")
-                   (format nil "<input name='~A' value='{{ item.~A }}'>" field-name field-name))
+                   (format nil "<input name='~A' value='{{ item.~A }}'{% if max_length.~A %} maxlength='{{ max_length.~A }}'{% endif %} required>" field-name field-name field-name field-name))
                   ((string= field-type "DateTimeField")
-                   (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}'>" field-name field-name))
+                   (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}' required>" field-name field-name))
                   ((string= field-type "IntegerField")
-                   (format nil "<input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name))
+                   (format nil "<input name='~A' type='number' value='{{ item.~A }}' required>" field-name field-name))
                   ((string= field-type "ForeignKey")
                    (format nil "
 <select name='~A'>
@@ -515,7 +556,7 @@ def index(request):
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "<!-- ~A form -->
-<form class='form' action='~A/~A/' method='POST'>
+<form class='item-form' action='~A/~A/' method='POST'>
     {% csrf_token %}
     ~A
 
@@ -553,7 +594,7 @@ def index(request):
 
 (defun item-template-field (field)
   "Return the field of a generic item."
-  (format nil "{{ item.~A }}" (car field)))
+  (format nil "<p><strong>~A</strong>: {{ item.~A }}</p>" (car field) (car field)))
 
 (defun write-item-template (templates-dir spec model)
   "Write model_name_item.html."
@@ -563,14 +604,18 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A Item Template
+<h3>~A</h3>
 
-<a class='link' href='../../edit/{{ item.id }}/'>Edit item</a>
-<a class='link' href='../../delete/{{ item.id }}/'>Delete item</a>
+<div class='actions'>
+  <a class='link' href='../../edit/{{ item.id }}/'>Edit item</a>
+  <a class='link' href='../../delete/{{ item.id }}/'>Delete item</a>
+</div>
 
-{{ item }}
+<h4>{{ item }}</h4>
 
+<div class='item-details'>
 ~{~A~%~}
+</div>
 ~A"
                      (html-header spec model "Item")
                      model-name
@@ -586,7 +631,7 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A Edit Template
+<h3>Edit ~A</h3>
 
 {% include '~A/~A_do_edit_form.html' %}
 
@@ -605,11 +650,11 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A Confirm Delete
+<h3>Confirm Delete ~A</h3>
 
-{{ item }}
+<h4>{{ item }}</h4>
 
-<form class='form' action='../../do_delete/', method='POST'>
+<form class='item-form' action='../../do_delete/', method='POST'>
     {% csrf_token %}
     <input type='hidden' name='id' value='{{ item.id }}'>
     <input type='submit' value='Yes, delete it'>
