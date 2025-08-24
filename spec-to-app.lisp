@@ -42,6 +42,10 @@ a {
   text-decoration: none;
 }
 
+img {
+  max-width: 300px;
+}
+
 h3 {
   margin: 1rem;
   padding: 0;
@@ -170,7 +174,7 @@ input[type=submit] {
 
 (defun convert-pairs (pairs)
   "Convert a list of properties given as a flat list, alternating keys and values (a 1 b 2 c 3)."
-  (format nil "~{~A=~A,~}" pairs))
+  (format nil "~{~A=~A, ~}" pairs))
 
 (defun convert-model-field-value (field-value)
   "Convert the value side of the field assignment."
@@ -325,13 +329,23 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 (defun form-post-request-item (model-field)
   "Object or value to be read from POST data."
   (let ((foreign-key-model-name (nth 2 (cadr model-field)))
+        (model-name (car model-field))
         (field-type (caadr model-field)))
     (cond ((string= field-type "ForeignKey")
            (format nil "~A = models.~A.objects.get(user=request.user, pk=request.POST['~A'])"
-                   (car model-field) foreign-key-model-name (car model-field)))
+                   model-name foreign-key-model-name model-name))
+          ((string= field-type "ImageField")
+           (format nil "~A = request.FILES['~A']
+    file_extension = os.path.splitext(~A.name)[1]
+    unique_filename = f'~A{file_extension}'
+    ~A = default_storage.save(unique_filename, ContentFile(~A.read()))
+"
+                   model-name model-name
+                   model-name
+                   (format nil "~A" (get-universal-time))
+                   model-name model-name))
           (t (format nil "~A = request.POST['~A']"
-                     (car model-field)
-                     (car model-field))))))
+                     model-name model-name)))))
 
 (defun do-add-view-field-pairs (model-field)
   "Assignment of a value to an argument."
@@ -487,9 +501,12 @@ urlpatterns = [
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "from datetime import datetime, date, timedelta
+import os
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect
 
 from . import models
@@ -552,6 +569,8 @@ def index(request):
                    (format nil "<input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name))
                   ((string= field-type "TextField")
                    (format nil "<textarea name='~A' rows='12' cols='80'>{{ item.~A }}</textarea>" field-name field-name))
+                  ((string= field-type "ImageField")
+                   (format nil "<input name='~A' type='file'>" field-name))
                   ((string= field-type "ForeignKey")
                    (format nil "
 <select name='~A'>
@@ -573,7 +592,7 @@ def index(request):
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "<!-- ~A form -->
-<form class='item-form' action='~A/do_~A/' method='POST'>
+<form class='item-form' action='~A/do_~A/' method='POST' enctype='multipart/form-data'>
     {% csrf_token %}
     ~A
 
@@ -611,7 +630,10 @@ def index(request):
 
 (defun item-template-field (field)
   "Return the field of a generic item."
-  (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field)))
+  (let ((field-type (caadr field)))
+    (cond ((string= field-type "ImageField")
+           (format nil "<p><strong>{{ help_text.~A }}</strong>: <img src='/media/{{ item.~A }}'></p>" (car field) (car field)))
+          (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
 
 (defun write-item-template (templates-dir spec model)
   "Write model_name_item.html."

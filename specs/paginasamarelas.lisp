@@ -13,6 +13,7 @@
                   ("telefone" ("CharField" "max_length" "80" "help_text" "'Telefone fixo'"))
                   ("whatsapp" ("CharField" "max_length" "32" "help_text" "'Número de WhatsApp'"))
                   ("website" ("CharField" "max_length" "32" "help_text" "'Website'"))
-                  ("descricao" ("TextField" "help_text" "'Descrição'")))
+                  ("descricao" ("TextField" "help_text" "'Descrição'"))
+                  ("foto" ("ImageField" "upload_to" "'empresas/'" "blank" "True" "null" "True" "help_text" "'Foto'")))
          :ordering "['nome']"
          :str "self.nome")))
