@@ -150,7 +150,7 @@ input[type=submit] {
 
 (defun header-link (spec model)
   "Create an HTML link for the header."
-  (format nil "<a class='link' href='/~A/~A/list/'>~A</a>"
+  (format nil "<a class='link' href='/~A/crudadmin/~A/list/'>~A</a>"
           (getf spec :app-name)
           (string-downcase (getf model :model-name))
           (getf model :model-name)))
@@ -218,7 +218,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 
 (defun url-name (model-name action &optional (url-component ""))
   "Create URL components from the model name and action."
-  (format nil "'~A/~A/~A', views.~A_~A, name='~A_~A'"
+  (format nil "'crudadmin/~A/~A/~A', views.~A_~A, name='~A_~A'"
           (string-downcase model-name) action url-component
           (string-downcase model-name) action
           (string-downcase model-name) action))
@@ -709,7 +709,7 @@ def index(request):
   "Links to the list view of each model."
   (mapcar #'(lambda (model)
               (format nil "<div>
-    <a class='list-link' href='/~A/~A/list/'>~A</a>
+    <a class='list-link' href='/~A/crudadmin/~A/list/'>~A</a>
 </div>
 "
                       app-name
