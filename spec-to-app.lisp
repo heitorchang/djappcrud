@@ -20,7 +20,8 @@
 (defparameter *html-footer* "
     </div>
 <div class='footer'>
-    &copy; 2025 <a class='link' href='/admin/'>Admin</a>
+    <p><a class='link' href='/admin/'>Admin</a></p>
+    <p>&copy; 2025</p>
 </div>
 
     </body>
@@ -238,21 +239,6 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             model-name
             app-name (string-downcase model-name) action)))
 
-(defun item-view (app-name model)
-  "View function to display an item's details."
-  (let ((action "item")
-        (model-name (getf model :model-name)))
-    (format nil "def ~A_~A(request, item_id):
-    item = models.~A.objects.get(user=request.user, pk=item_id)
-    context = {'item': item}
-    context.update({'help_text': ~A})
-    return render(request, '~A/~A_~A.html', context)
-"
-            (string-downcase model-name) action
-            model-name
-            (context-help-text (getf model :fields))
-            app-name (string-downcase model-name) action)))
-
 (defun view-foreign-key (foreign-key)
   "Definition of an individual foreign key."
   (let ((model-name (nth 2 (cadr foreign-key))))
@@ -313,6 +299,21 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             (context-help-text (getf model :fields))
             (context-max-length (getf model :fields))
             app-name (string-downcase model-name))))
+
+(defun item-view (app-name model)
+  "View function to display an item's details."
+  (let ((action "item")
+        (model-name (getf model :model-name)))
+    (format nil "def ~A_~A(request, item_id):
+    item = models.~A.objects.get(user=request.user, pk=item_id)
+    context = {'item': item}
+    context.update({'help_text': ~A})
+    return render(request, '~A/~A_~A.html', context)
+"
+            (string-downcase model-name) action
+            model-name
+            (context-help-text (getf model :fields))
+            app-name (string-downcase model-name) action)))
 
 (defun form-post-request-item (model-field)
   "Object or value to be read from POST data."
