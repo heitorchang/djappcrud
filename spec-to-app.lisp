@@ -564,7 +564,7 @@ def index(request):
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "<!-- ~A form -->
-<form class='item-form' action='~A/~A/' method='POST'>
+<form class='item-form' action='~A/do_~A/' method='POST'>
     {% csrf_token %}
     ~A
 
@@ -575,9 +575,9 @@ def index(request):
 </form>
 "
                      model-name
-                     (if (string= form-action "do_edit") "../.." "..")
+                     (if (string= form-action "edit") "../.." "..")
                      form-action
-                     (if (string= form-action "do_edit") (format nil "<input type='hidden' name='id' value='{{ item.id }}'>") "")
+                     (if (string= form-action "edit") (format nil "<input type='hidden' name='id' value='{{ item.id }}'>") "")
                      (mapcar #'form-field (getf model :fields)))
              out))))
 
@@ -591,7 +591,7 @@ def index(request):
 
 <h3>Add ~A</h3>
 
-{% include '~A/~A_do_add_form.html' %}
+{% include '~A/~A_add_form.html' %}
 
 ~A"
                      (html-header spec model "Add")
@@ -642,7 +642,7 @@ def index(request):
 
 <h3>Edit ~A</h3>
 
-{% include '~A/~A_do_edit_form.html' %}
+{% include '~A/~A_edit_form.html' %}
 
 ~A"
                      (html-header spec model "Edit")
@@ -677,10 +677,10 @@ def index(request):
 (defun write-template-for-model-action (templates-dir spec model action)
   "Call specific template-writing function based on the given action."
   (cond ((string= action "list") (write-list-template templates-dir spec model))
-        ((string= action "add_form") (write-form-template templates-dir model "do_add"))
+        ((string= action "add_form") (write-form-template templates-dir model "add"))
         ((string= action "add") (write-add-template templates-dir spec model))
         ((string= action "item") (write-item-template templates-dir spec model))
-        ((string= action "edit_form") (write-form-template templates-dir model "do_edit"))
+        ((string= action "edit_form") (write-form-template templates-dir model "edit"))
         ((string= action "edit") (write-edit-template templates-dir spec model))
         ((string= action "delete") (write-delete-template templates-dir spec model))
         (t (format t "write-template-for-model-action: unknown action type: ~A" action))))
