@@ -344,6 +344,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     except MultiValueDictKeyError:
         pass
 "
+                   model-name
                    model-name model-name
                    model-name
                    model-name model-name))
