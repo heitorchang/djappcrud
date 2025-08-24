@@ -335,10 +335,14 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
            (format nil "~A = models.~A.objects.get(user=request.user, pk=request.POST['~A'])"
                    model-name foreign-key-model-name model-name))
           ((string= field-type "ImageField")
-           (format nil "~A = request.FILES['~A']
-    file_extension = os.path.splitext(~A.name)[1]
-    unique_filename = f'{uuid.uuid4()}{file_extension}'
-    ~A = default_storage.save(unique_filename, ContentFile(~A.read()))
+           (format nil "~A = None
+    try:
+        ~A = request.FILES['~A']
+        file_extension = os.path.splitext(~A.name)[1]
+        unique_filename = f'{uuid.uuid4()}{file_extension}'
+        ~A = default_storage.save(unique_filename, ContentFile(~A.read()))
+    except MultiValueDictKeyError:
+        pass
 "
                    model-name model-name
                    model-name
@@ -394,9 +398,10 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 
 (defun do-edit-view-field-pairs (model-field)
   "Assignment of a value to an item's field."
-  (format nil "item.~A = ~A"
+  (format nil "if ~A:
+        item.~A = ~A"
           (car model-field)
-          (car model-field)))
+          (car model-field) (car model-field)))
 
 (defun do-edit-view (app-name model)
   "View function that saves an edit of an item."
@@ -508,6 +513,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect
+from django.utils.datastructures import MultiValueDictKeyError
 
 from . import models
 
@@ -632,7 +638,7 @@ def index(request):
   "Return the field of a generic item."
   (let ((field-type (caadr field)))
     (cond ((string= field-type "ImageField")
-           (format nil "<p><strong>{{ help_text.~A }}</strong>: <img src='/media/{{ item.~A }}'></p>" (car field) (car field)))
+           (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</p>" (car field) (car field) (car field)))
           (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
 
 (defun write-item-template (templates-dir spec model)
