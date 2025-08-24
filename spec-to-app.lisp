@@ -47,6 +47,13 @@ h3 {
   padding: 0;
 }
 
+.content h3 a.link {
+  margin: 0;
+  padding: 0;
+  background-color: inherit;
+  color: SteelBlue;
+}
+
 h4 {
   margin: 1rem 1.5rem;
   padding: 0;
@@ -620,6 +627,7 @@ def index(request):
   <a class='link' href='../../add/'>Add</a>
   <a class='link' href='../../edit/{{ item.id }}/'>Edit item</a>
   <a class='link' href='../../delete/{{ item.id }}/'>Delete item</a>
+  <a class='link' href='../../list/'>List</a>
 </div>
 
 <h4>{{ item }}</h4>
