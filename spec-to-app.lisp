@@ -1,29 +1,122 @@
 (defparameter *output-base-dir* "/home/hcbel/code/crudproject/")
 (defparameter *output-app-dir* "")
 
-(defparameter *html-header* "<!DOCTYPE html>
+(defparameter *html-header* "{% load static %}
+<!DOCTYPE html>
 <html lang='en'>
     <head>
         <meta charset='utf-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1'>
-        <link rel='stylesheet' href='/static/css/style.css'>
+        <link rel='stylesheet' href='{% static '~A/css/style.css' %}'>
         <title>~A - ~A: ~A</title>
     </head>
     <body>
+    <div class='header'>
 ~{~A~%~}
+    </div>
+    <div class='content'>
 ")
 
 (defparameter *html-footer* "
-<div>
-    <a href='/admin'>Admin</a>
+    </div>
+<div class='footer'>
+    &copy; 2025 <a class='link' href='/admin/'>Admin</a>
 </div>
 
     </body>
 </html>")
 
+(defparameter *style-css* "
+html {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+}
+
+a {
+  text-decoration: none;
+}
+
+h3 {
+  margin: 1rem;
+  padding: 0;
+}
+
+ul {
+  list-style-type: circle;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+td {
+  border: none;
+}
+
+div {
+  padding: 0.6rem 0;
+}
+
+div.header {
+  padding-left: 0.5rem;
+  background-color: LightBlue;
+}
+
+.link {
+  padding: 0.3rem;
+  border-radius: 0.2rem;
+}
+
+.header .link {
+  background-color: MidnightBlue;
+  color: LemonChiffon;
+}
+
+.content .link {
+  background-color: DarkSeaGreen;
+  color: Indigo;
+}
+
+.content ul li .link {
+  background-color: AliceBlue;
+  color: MidnightBlue;
+}
+
+div.footer {
+  margin: 1.5rem 0.5rem;
+  color: DarkGrey;
+}
+
+.footer .link {
+  color: DarkGrey;
+}
+
+.form {
+  background-color: PapayaWhip;
+  padding: 0.5rem;
+}
+
+input[type=submit] {
+  margin: 0.5rem;
+  padding: 0.25rem;
+  border: 1px solid DarkGrey;
+  cursor: pointer;
+  border-radius: 0.15rem;
+}
+
+.list-actions {
+  padding-left: 1.5rem;
+}
+")
+
 (defun header-link (spec model)
   "Create an HTML link for the header."
-  (format nil "<a href='/~A/~A/list/'>~A</a>"
+  (format nil "<a class='link' href='/~A/~A/list/'>~A</a>"
           (getf spec :app-name)
           (string-downcase (getf model :model-name))
           (getf model :model-name)))
@@ -31,6 +124,7 @@
 (defun html-header (spec model page-name)
   "Return the HTML header as a string."
   (format nil *html-header*
+          (getf spec :app-name)
           (string-capitalize (getf spec :app-name))
           (getf model :model-name)
           page-name
@@ -365,15 +459,17 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A List Template
+<h3>~A</h3>
 
-<div>
-    <a href='../add/'>Add</a>
+<div class='list-actions'>
+    <a class='link' href='../add/'>Add</a>
 </div>
 
+<ul>
 {% for item in items %}
-    <a href='../item/{{ item.id }}/'>{{ item }}</a>
+    <li><a class='link' href='../item/{{ item.id }}/'>{{ item }}</a></li>
 {% endfor %}
+</ul>
 
 ~A
 "
@@ -419,7 +515,7 @@ def index(request):
                          :direction :output
                          :if-exists :supersede)
       (princ (format nil "<!-- ~A form -->
-<form action='~A/~A/' method='POST'>
+<form class='form' action='~A/~A/' method='POST'>
     {% csrf_token %}
     ~A
 
@@ -444,7 +540,7 @@ def index(request):
                          :if-exists :supersede)
       (princ (format nil "~A
 
-~A Add Template
+<h3>Add ~A</h3>
 
 {% include '~A/~A_do_add_form.html' %}
 
@@ -469,8 +565,8 @@ def index(request):
 
 ~A Item Template
 
-<a href='../../edit/{{ item.id }}/'>Edit item</a>
-<a href='../../delete/{{ item.id }}/'>Delete item</a>
+<a class='link' href='../../edit/{{ item.id }}/'>Edit item</a>
+<a class='link' href='../../delete/{{ item.id }}/'>Delete item</a>
 
 {{ item }}
 
@@ -513,7 +609,7 @@ def index(request):
 
 {{ item }}
 
-<form action='../../do_delete/', method='POST'>
+<form class='form' action='../../do_delete/', method='POST'>
     {% csrf_token %}
     <input type='hidden' name='id' value='{{ item.id }}'>
     <input type='submit' value='Yes, delete it'>
@@ -549,7 +645,7 @@ def index(request):
   "Links to the list view of each model."
   (mapcar #'(lambda (model)
               (format nil "<div>
-    <a href='/~A/~A/list/'>~A</a>
+    <a class='list-link' href='/~A/~A/list/'>~A</a>
 </div>
 "
                       app-name
@@ -640,6 +736,13 @@ from .models import (~{~A, ~})
 # Create your tests here.
 ") out)))
 
+(defun write-static-style-css (spec)
+  (let ((static-css-dir (concatenate 'string *output-app-dir* "static/" (getf spec :app-name) "/css/")))
+    (ensure-directories-exist static-css-dir)
+    (with-open-file (out (concatenate 'string static-css-dir "style.css")
+                         :direction :output
+                         :if-exists :supersede)
+      (princ (format nil *style-css*) out))))
 
 (defun read-spec (spec-filename)
   "Load the Lisp spec object from the filename."
@@ -666,4 +769,5 @@ from .models import (~{~A, ~})
     (write-views spec)
     (write-templates spec)
     (write-index-template spec)
+    (write-static-style-css spec)
     t))
