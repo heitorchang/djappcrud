@@ -1,4 +1,4 @@
-(defparameter *output-base-dir* "/home/hcbel/code/djappcrud/out/")
+(defparameter *output-base-dir* "/home/hcbel/code/crudproject/")
 (defparameter *output-app-dir* "")
 
 (defparameter *html-header* "<!DOCTYPE html>
@@ -20,28 +20,6 @@
 
     </body>
 </html>")
-
-(defun convert-spec (spec-filename)
-  "Convert a spec Lisp object. The main function."
-
-  (let ((spec (read-spec spec-filename)))
-    (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
-    (ensure-directories-exist *output-app-dir*)
-    (create-init-py)
-    (create-migrations-init-py)
-    (write-apps spec)
-    (write-admin spec)
-    (write-models spec)
-    (write-urls spec)
-    (write-views spec)
-    (write-templates spec)
-    (write-index-template spec)
-    t))
-
-(defun read-spec (spec-filename)
-  "Load the Lisp spec object from the filename."
-  (with-open-file (in spec-filename)
-    (read in)))
 
 (defun header-link (spec model)
   "Create an HTML link for the header."
@@ -167,18 +145,35 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
   (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
     (format nil "{~{~A~}}" (mapcar #'(lambda (foreign-key) (format nil "'~A': ~A, " (car foreign-key) (car foreign-key))) foreign-keys))))
 
+(defun context-help-text (fields)
+  "Helper to read help_text values and generate a dict."
+  (let ((fields-with-help (remove-if-not #'(lambda (field)
+                                             (let ((attributes (cadr field)))
+                                               (member "help_text" attributes :test #'equal)))
+                                         fields)))
+    (format nil "{~{~{'~A': ~A~}~}}"
+            (mapcar #'(lambda (field)
+                        (let* ((field-name (car field))
+                               (attributes (cadr field))
+                               (help-index (position "help_text" attributes :test #'equal)))
+                          (list field-name (nth (1+ help-index) attributes))))
+                    fields-with-help))))
+
 (defun add-view (app-name model)
   "View function to show the add form."
   (let ((action "add")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
 ~A
-    return render(request, '~A/~A_add.html', ~A)
+    context = ~A
+    context.update({'help_text': ~A})
+    return render(request, '~A/~A_add.html', context)
 "
             (string-downcase model-name) action
             (view-foreign-keys (getf model :fields))
-            app-name (string-downcase model-name)
-            (context-foreign-keys (getf model :fields)))))
+            (context-foreign-keys (getf model :fields))
+            (context-help-text (getf model :fields))
+            app-name (string-downcase model-name))))
 
 (defun form-post-request-item (model-field)
   "Object or value to be read from POST data."
@@ -225,12 +220,14 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 ~A
     context = ~A
     context.update({'item': item})
+    context.update({'help_text': ~A})
     return render(request, '~A/~A_~A.html', context)
 "
             (string-downcase model-name) action
             model-name
             (view-foreign-keys (getf model :fields))
             (context-foreign-keys (getf model :fields))
+            (context-help-text (getf model :fields))
             app-name (string-downcase model-name) action)))
 
 (defun do-edit-view-field-pairs (model-field)
@@ -390,18 +387,19 @@ def index(request):
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
     (format nil "<div>
-    ~A
+    ~A {{ help_text.~A }} ~A
 </div>
 
 "
+            field-name field-name
             (cond ((string= field-type "CharField")
-                   (format nil "~A <input name='~A' value='{{ item.~A }}'>" field-name field-name field-name))
+                   (format nil "<input name='~A' value='{{ item.~A }}'>" field-name field-name))
                   ((string= field-type "DateTimeField")
-                   (format nil "~A <input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}'>" field-name field-name field-name))
+                   (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}'>" field-name field-name))
                   ((string= field-type "IntegerField")
-                   (format nil "~A <input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name field-name))
+                   (format nil "<input name='~A' type='number' value='{{ item.~A }}'>" field-name field-name))
                   ((string= field-type "ForeignKey")
-                   (format nil "~A
+                   (format nil "
 <select name='~A'>
 {% for row in ~A %}
     <option value='{{ row.id }}'{% if row.id == item.~A.id %} selected{% endif %}>
@@ -409,10 +407,10 @@ def index(request):
     </option>
 {% endfor %}
 </select>
-" field-name field-name field-name field-name))
+" field-name field-name field-name))
                   (t (progn
                        (format t "form-field: warning: field-type ~A not defined yet.~%" field-type)
-                       (format nil "~A <input name='~A'>" field-name field-name)))))))
+                       (format nil "<input name='~A'>" field-name)))))))
 
 (defun write-form-template (templates-dir model form-action)
   "Write an item form appropriate for the form-action."
@@ -641,3 +639,31 @@ from .models import (~{~A, ~})
 
 # Create your tests here.
 ") out)))
+
+
+(defun read-spec (spec-filename)
+  "Load the Lisp spec object from the filename."
+  (with-open-file (in spec-filename)
+    (read in)))
+
+(defun convert-spec (spec-filename)
+  "Convert a spec Lisp object. The main function."
+  (let ((spec (read-spec spec-filename)))
+    (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
+    ;; make a backup of existing version
+    (when (probe-file *output-app-dir*)
+      (let ((backup-base-dir (concatenate 'string *output-base-dir* "backup/")))
+        (ensure-directories-exist backup-base-dir)
+        (rename-file *output-app-dir*
+                     (concatenate 'string backup-base-dir (getf spec :app-name) "_" (format nil "~A" (get-universal-time)) "/"))))
+    (ensure-directories-exist *output-app-dir*)
+    (create-init-py)
+    (create-migrations-init-py)
+    (write-apps spec)
+    (write-admin spec)
+    (write-models spec)
+    (write-urls spec)
+    (write-views spec)
+    (write-templates spec)
+    (write-index-template spec)
+    t))
