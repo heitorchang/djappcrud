@@ -274,7 +274,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
                                              (let ((attributes (cadr field)))
                                                (member "max_length" attributes :test #'equal)))
                                          fields)))
-    (format nil "{~{~{'~A': ~A~}~}}"
+    (format nil "{~{~{'~A': ~A, ~}~}}"
             (mapcar #'(lambda (field)
                         (let* ((field-name (car field))
                                (attributes (cadr field))
@@ -543,6 +543,8 @@ def index(request):
                    (format nil "<input name='~A' type='datetime-local' value='{{ item.~A|date:'Y-m-d\\TH:i' }}' required>" field-name field-name))
                   ((string= field-type "IntegerField")
                    (format nil "<input name='~A' type='number' value='{{ item.~A }}' required>" field-name field-name))
+                  ((string= field-type "TextField")
+                   (format nil "<textarea name='~A' rows='12' cols='80' required>{{ item.~A }}</textarea>" field-name field-name))
                   ((string= field-type "ForeignKey")
                    (format nil "
 <select name='~A'>
@@ -809,10 +811,14 @@ from .models import (~{~A, ~})
     (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf spec :app-name) "/"))
     ;; make a backup of existing version
     (when (probe-file *output-app-dir*)
-      (let ((backup-base-dir (concatenate 'string *output-base-dir* "backup/")))
+      (let* ((backup-base-dir (concatenate 'string *output-base-dir* "backup/"))
+             (timestamped-backup-dir (concatenate 'string backup-base-dir (getf spec :app-name) "_" (format nil "~A" (get-universal-time)) "/")))
         (ensure-directories-exist backup-base-dir)
-        (rename-file *output-app-dir*
-                     (concatenate 'string backup-base-dir (getf spec :app-name) "_" (format nil "~A" (get-universal-time)) "/"))))
+        (rename-file *output-app-dir* timestamped-backup-dir)
+        ;; copy migration files back to "real" app directory
+        (ensure-directories-exist (concatenate 'string *output-app-dir* "migrations/"))
+        (dolist (file (uiop:directory-files (concatenate 'string timestamped-backup-dir "migrations/")))
+          (uiop:copy-file file (concatenate 'string *output-app-dir* "migrations/" (file-namestring file))))))
     (ensure-directories-exist *output-app-dir*)
     (create-init-py)
     (create-migrations-init-py)

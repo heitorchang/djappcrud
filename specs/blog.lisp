@@ -3,9 +3,10 @@
 
  :models
  ((:model-name "Entry"
-   :fields (("user" ("ForeignKey" "to" "get_user_model()" "on_delete" "models.CASCADE"))
-            ("created_at" ("DateTimeField" "default" "datetime.datetime.now"))
-            ("title" ("CharField" "max_length" "150")))
+   :fields (("created_at" ("DateTimeField" "default" "datetime.now" "help_text" "'When file was created'"))
+            ("subject" ("CharField" "max_length" "50" "help_text" "'Broad subject'"))
+            ("title" ("CharField" "max_length" "150" "help_text" "'Post title'"))
+            ("body" ("TextField" "help_text" "'The post body'")))
 
    :ordering "['-created_at']"
-   :str "{self.created_at.strftime('%Y-%m-%d')} {self.title}")))
+   :str "f'{self.created_at.strftime('%Y-%m-%d')} {self.title}'")))
