@@ -326,7 +326,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
             (context-help-text (getf model :fields))
             app-name (string-downcase model-name) action)))
 
-(defun form-post-request-item (model-field)
+(defun form-post-request-item (app-name model-field)
   "Object or value to be read from POST data."
   (let ((foreign-key-model-name (nth 2 (cadr model-field)))
         (model-name (car model-field))
@@ -340,14 +340,14 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         ~A = request.FILES['~A']
         file_extension = os.path.splitext(~A.name)[1]
         unique_filename = f'{uuid.uuid4()}{file_extension}'
-        ~A = default_storage.save(unique_filename, ContentFile(~A.read()))
+        ~A = default_storage.save(f'~A/{unique_filename}', ContentFile(~A.read()))
     except MultiValueDictKeyError:
         pass
 "
                    model-name
                    model-name model-name
                    model-name
-                   model-name model-name))
+                   model-name app-name model-name))
           (t (format nil "~A = request.POST['~A']"
                      model-name model-name)))))
 
@@ -371,7 +371,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     return redirect('~A:~A_list')
 "
             (string-downcase model-name) action
-            (mapcar #'form-post-request-item model-fields)
+            (mapcar #'(lambda (model-field) (form-post-request-item app-name model-field)) model-fields)
             model-name
             (mapcar #'do-add-view-field-pairs model-fields)
             app-name (string-downcase model-name))))
@@ -422,7 +422,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     return redirect('~A:~A_list')
 "
             (string-downcase model-name) action
-            (mapcar #'form-post-request-item model-fields)
+            (mapcar #'(lambda (model-field) (form-post-request-item app-name model-field)) model-fields)
             model-name
             (mapcar #'do-edit-view-field-pairs model-fields)
             app-name (string-downcase model-name))))
