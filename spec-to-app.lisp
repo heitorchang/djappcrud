@@ -337,7 +337,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
           ((string= field-type "ImageField")
            (format nil "~A = None
     try:
-        if item.~A:
+        if item and item.~A:
             default_storage.delete(f'{item.~A}')
         ~A = request.FILES['~A']
         file_extension = os.path.splitext(~A.name)[1]
@@ -371,6 +371,8 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
     (format nil "def ~A_~A(request):
+    item = None
+
 ~{    ~A~%~}
     models.~A.objects.create(
         user = request.user,
