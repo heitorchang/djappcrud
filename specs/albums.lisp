@@ -12,6 +12,7 @@
          :fields (("name" ("CharField" "max_length" "80" "help_text" "'Name of album'"))
                   ("artist" ("ForeignKey" "to" "Artist" "on_delete" "CASCADE" "null" "True" "help_text" "'Artist'"))
                   ("rating" ("IntegerField" "help_text" "'Rating (1-10)'"))
+                  ("ripped" ("BooleanField" "help_text" "'Ripped?'"))
                   ("photo" ("ImageField" "help_text" "'Album cover'")))
          :ordering "['-rating', 'name']"
          :str "self.name")))

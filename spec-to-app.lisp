@@ -1,4 +1,4 @@
-(defparameter *output-base-dir* "/home/hcbel/code/crudproject/")
+(defparameter *output-base-dir* "/home/hcbel/code/kbapps/")
 (defparameter *output-app-dir* "")
 
 (defparameter *html-header* "{% load static %}
@@ -329,11 +329,11 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 (defun form-post-request-item (app-name model-field)
   "Object or value to be read from POST data."
   (let ((foreign-key-model-name (nth 2 (cadr model-field)))
-        (model-name (car model-field))
+        (field-name (car model-field))
         (field-type (caadr model-field)))
     (cond ((string= field-type "ForeignKey")
            (format nil "~A = models.~A.objects.get(user=request.user, pk=request.POST['~A'])"
-                   model-name foreign-key-model-name model-name))
+                   field-name foreign-key-model-name field-name))
           ((string= field-type "ImageField")
            (format nil "~A = None
     try:
@@ -344,12 +344,17 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     except MultiValueDictKeyError:
         pass
 "
-                   model-name
-                   model-name model-name
-                   model-name
-                   model-name app-name model-name))
+                   field-name
+                   field-name field-name
+                   field-name
+                   field-name app-name field-name))
+          ((string= field-type "BooleanField")
+           (format nil "~A = request.POST.get('~A', False)
+    if ~A:
+        ~A = True
+" field-name field-name field-name field-name))
           (t (format nil "~A = request.POST['~A']"
-                     model-name model-name)))))
+                     field-name field-name)))))
 
 (defun do-add-view-field-pairs (model-field)
   "Assignment of a value to an argument."
@@ -400,9 +405,13 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 (defun do-edit-view-field-pairs (model-field)
   "Assignment of a value to an item's field."
   (format nil "if ~A:
-        item.~A = ~A"
+        item.~A = ~A
+~A"
           (car model-field)
-          (car model-field) (car model-field)))
+          (car model-field) (car model-field)
+          (if (string= (caadr model-field) "BooleanField")
+              (format nil "    else:
+        item.~A = False~%" (car model-field)) "")))
 
 (defun do-edit-view (app-name model)
   "View function that saves an edit of an item."
@@ -578,6 +587,8 @@ def index(request):
                    (format nil "<textarea name='~A' rows='12' cols='80'>{{ item.~A }}</textarea>" field-name field-name))
                   ((string= field-type "ImageField")
                    (format nil "<input name='~A' type='file'>" field-name))
+                  ((string= field-type "BooleanField")
+                   (format nil "<input name='~A' type='checkbox'{% if item.~A %} checked{% endif %}>" field-name field-name))
                   ((string= field-type "ForeignKey")
                    (format nil "
 <select name='~A'>
@@ -640,6 +651,8 @@ def index(request):
   (let ((field-type (caadr field)))
     (cond ((string= field-type "ImageField")
            (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</p>" (car field) (car field) (car field)))
+          ((string= field-type "BooleanField")
+           (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}True{% else %}False{% endif %}</p>" (car field) (car field)))
           (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
 
 (defun write-item-template (templates-dir spec model)
