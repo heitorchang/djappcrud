@@ -3,7 +3,7 @@
 
  :models
        ((:model-name "Artist"
-         :fields (("name" ("CharField" "max_length" "80" "help_text" "'Name of artist'"))
+         :fields (("name" ("CharField" "max_length" "80" "help_text" "'Artist\\'s name'"))
                   ("photo" ("ImageField" "help_text" "'Photo of artist'")))
          :ordering "['name']"
          :str "self.name")
