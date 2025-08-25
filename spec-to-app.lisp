@@ -776,7 +776,7 @@ def index(request):
 ~{~A~}
 ~A
 "
-                     (html-header spec `(:model-name ,(string-capitalize(getf spec :app-name))) "Home")
+                     (html-header spec `(:model-name ,(string-capitalize (getf spec :app-name))) "Home")
                      (index-model-links (getf spec :app-name) (getf spec :models))
                      (html-footer))
              out))))
