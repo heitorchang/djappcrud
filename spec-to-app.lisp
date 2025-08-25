@@ -337,6 +337,8 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
           ((string= field-type "ImageField")
            (format nil "~A = None
     try:
+        if item.~A:
+            default_storage.delete(f'{item.~A}')
         ~A = request.FILES['~A']
         file_extension = os.path.splitext(~A.name)[1]
         unique_filename = f'{uuid.uuid4()}{file_extension}'
@@ -344,6 +346,8 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     except MultiValueDictKeyError:
         pass
 "
+                   field-name
+                   field-name
                    field-name
                    field-name field-name
                    field-name
@@ -419,11 +423,12 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
     (format nil "def ~A_~A(request):
-~{    ~A~%~}
     item = models.~A.objects.get(
         user = request.user,
         pk = request.POST['id']
     )
+
+~{    ~A~%~}
 
 ~{    ~A~%~}
     item.save()
@@ -431,8 +436,8 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
     return redirect('~A:~A_list')
 "
             (string-downcase model-name) action
-            (mapcar #'(lambda (model-field) (form-post-request-item app-name model-field)) model-fields)
             model-name
+            (mapcar #'(lambda (model-field) (form-post-request-item app-name model-field)) model-fields)
             (mapcar #'do-edit-view-field-pairs model-fields)
             app-name (string-downcase model-name))))
 
