@@ -344,8 +344,7 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
         unique_filename = f'{uuid.uuid4()}{file_extension}'
         ~A = default_storage.save(f'~A/{unique_filename}', ContentFile(~A.read()))
     except MultiValueDictKeyError:
-        pass
-"
+        pass"
                    field-name
                    field-name
                    field-name
