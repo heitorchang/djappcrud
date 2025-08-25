@@ -95,8 +95,8 @@ div.header {
 }
 
 .content .link {
-  background-color: DarkSeaGreen;
-  color: Indigo;
+  background-color: BlanchedAlmond;
+  color: DarkSlateBlue;
 }
 
 .content ul li .link {
