@@ -1,0 +1,4 @@
+Version 2
+
+[  ] Use actual CSS file
+[  ] Use template base.html and includes
