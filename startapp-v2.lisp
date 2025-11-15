@@ -857,7 +857,7 @@ from django.test import TestCase
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_delete" ".html")
       (format out "{% extends '~A/base.html' %}
-{% block pagetitle %}~A - List{% endblock %}
+{% block pagetitle %}~A - Delete{% endblock %}
 
 {% block content %}
 

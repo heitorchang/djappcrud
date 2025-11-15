@@ -16,6 +16,8 @@ Spec
 
 See the specs/ directory for examples.
 
+Specs with *local* in their name will not be saved to Git (see .gitignore)
+
 Model names should be capitalized.
 
 A "ForeignKey" must have "to" and "OtherModel" immediately after "ForeignKey" and a "on_delete" "CASCADE/SET_NULL" attribute pair.
@@ -47,4 +49,4 @@ urlpatterns = [
 Define in settings.py:
 
 MEDIA_URL = 'media/'
-MEDIA_ROOT = '/home/USER/DJANGO_PROJECT_NAME/media/'
+MEDIA_ROOT = '/home/USER/PATH_TO/DJANGO_PROJECT_NAME/media/'
