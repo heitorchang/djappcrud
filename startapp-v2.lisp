@@ -127,7 +127,7 @@ Example:
   ;; (write-views)
   ;; (write-tests)
 
-  ;; Replace templates with ones including "base.html"
+  ;; TODO: Replace templates with ones including "base.html"
   ;; (write-templates)
   ;; (write-index-template)
 
