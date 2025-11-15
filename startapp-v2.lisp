@@ -35,9 +35,8 @@
           (getf model :model-name)))
 
 
-(defparameter *html-base*
-  (format nil "
-{% load static %}
+(defparameter *html-base* "{% load static %}
+
 <!DOCTYPE html>
 <html lang=\"en\">
     <head>
@@ -55,11 +54,7 @@
         </div>
     </body>
 </html>
-"
-          *app-name*
-          *app-name*
-          (format nil "<div class=\"topbar\">~{~A~}</div>"
-                  (mapcar #'header-link (getf *spec* :models)))))
+")
 
 
 (defparameter *style-css* "/* style-css */
@@ -275,31 +270,6 @@ input[type=submit] {
         (url-name model-name "do_edit")
         (url-name model-name "delete" "<int:item_id>/")
         (url-name model-name "do_delete")))
-
-
-(defun view-name-for-model-action (model action)
-  "Create a view function definition."
-  (cond ((string= action "list") (list-view model))
-        ((string= action "item") (item-view model))
-        ((string= action "add") (add-view model))
-        ((string= action "do_add") (do-add-view model))
-        ((string= action "edit") (edit-view model))
-        ((string= action "do_edit") (do-edit-view model))
-        ((string= action "delete") (delete-view model))
-        ((string= action "do_delete") (do-delete-view model))))
-
-
-(defun crud-views (model)
-  "Generate views for the given name, returning a list of function definitions."
-
-  (list (view-name-for-model-action model "list")
-        (view-name-for-model-action model "item")
-        (view-name-for-model-action model "add")
-        (view-name-for-model-action model "do_add")
-        (view-name-for-model-action model "edit")
-        (view-name-for-model-action model "do_edit")
-        (view-name-for-model-action model "delete")
-        (view-name-for-model-action model "do_delete")))
 
 
 (defun list-view (model)
@@ -736,7 +706,11 @@ from django.test import TestCase
   "Write templates/app-name/base.html."
 
   (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "base.html"
-    (format out *html-base* *app-name* *app-name*)))
+    (format out *html-base*
+            *app-name*
+            *app-name*
+            (format nil "<div class=\"topbar\">~{~A~}</div>"
+                    (mapcar #'header-link (getf *spec* :models))))))
 
 
 (defun index-model-links (app-name models)
@@ -893,6 +867,9 @@ from django.test import TestCase
            (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</p>" (car field) (car field) (car field)))
           ((string= field-type "BooleanField")
            (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}True{% else %}False{% endif %}</p>" (car field) (car field)))
+          ((string= field-type "ForeignKey")
+           (let ((foreign-key-name (nth 2 (cadr field))))
+             (format nil "<p><strong>{{ help_text.~A }}</strong>: <a href='../../../~A/item/{{ item.~A.pk }}'>{{ item.~A }}</a></p>" (car field) (string-downcase foreign-key-name) (car field) (car field))))
           (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
 
 

@@ -19,9 +19,22 @@ from django.urls import path, include
     ...
     path('yourapp/', include('yourapp.urls')),
 
-If using MEDIA, add to the end of urlpatterns:
+A valid user is needed to interact with the generated pages and models.
 
-    ...
+If using MEDIA
+--------------
+
+install Pillow and edit urls.py, adding the import and the 'static' reference to the end of urlpatterns:
+
+from django.conf import settings
+from django.conf.urls.static import static
+...
+
+urlpatterns = [
+...
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-A valid user is needed to interact with the generated pages and models.
+Define in settings.py:
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = '/home/USER/DJANGO_PROJECT_NAME/media/'
