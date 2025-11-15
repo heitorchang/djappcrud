@@ -3,7 +3,11 @@ djappcrud
 
 Replaces "django-admin startapp appname".
 
-The main script, spec-to-app.lisp, converts an object with model fields into a new app.
+Tested with Django 5.2.
+
+The main script, startapp-vN.lisp, converts an object with model fields into a new app.
+
+Model names should be capitalized.
 
 A "ForeignKey" must have "to" and "OtherModel" immediately after "ForeignKey" and a "on_delete" "CASCADE/SET_NULL" attribute pair.
 
