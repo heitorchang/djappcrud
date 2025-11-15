@@ -205,9 +205,21 @@ input[type=submit] {
 (defun get-model-names ()
   (mapcar #'(lambda (model) (getf model :model-name)) (getf *spec* :models)))
 
+(defun convert-pair (key value)
+  "Convert to key=value, wrapping value in double quotes if key is help_text"
+  (if (string= key "help_text")
+      (format nil "~A=\"~A\", " key value)
+      (format nil "~A=~A, " key value)))
+
+(defun consume-pairs (remaining accumulated)
+  "Produce a list of key-value pair strings from remaining"
+  (if (null remaining)
+      accumulated
+      (consume-pairs (cddr remaining) (cons (convert-pair (car remaining) (cadr remaining)) accumulated))))
+
 (defun convert-pairs (pairs)
   "Convert a list of properties in a flat list, such as (a 1 b 2 c 3)."
-  (format nil "~{~A=~A, ~}" pairs))
+  (format nil "~{~A~}" (nreverse (consume-pairs pairs (list)))))
 
 (defun convert-model-field-value (field-value)
   "Convert the value side of the field assignment."
@@ -284,7 +296,7 @@ input[type=submit] {
                                              (let ((attributes (cadr field)))
                                                (member "help_text" attributes :test #'equal)))
                                          fields)))
-    (format nil "{~{~{'~A': ~A, ~}~}}"
+    (format nil "{~{~{'~A': \"~A\", ~}~}}"
             (mapcar #'(lambda (field)
                         (let* ((field-name (car field))
                                (attributes (cadr field))
@@ -932,11 +944,7 @@ directory if it exists. If not, create the target app directory."
 
 (defun convert-spec (simple-filename full-output-dir)
   "Given a filename located in *specs-dir*, including the .lisp extension, store the Lisp object
-spec in *spec* and save output to full-output-dir (include a trailing slash).
-
-Example:
-(convert-spec \"albums.lisp\" \"~/code/crudproject/\")
-"
+spec in *spec* and save output to full-output-dir (include a trailing slash)."
   (setf *output-base-dir* full-output-dir)
   (setf *spec* (read-spec simple-filename))
   (setf *app-name* (getf *spec* :app-name))

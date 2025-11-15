@@ -5,13 +5,22 @@ Replaces "django-admin startapp appname".
 
 Tested with Django 5.2.
 
-The main script, startapp-vN.lisp, converts an object with model fields into a new app.
+The main script, startapp-vVERSION.lisp, converts an object with model fields into a new app.
+
+Example:
+(convert-spec "albums.lisp" "~/code/crudproject/")
+
+
+Spec
+----
+
+See the specs/ directory for examples.
 
 Model names should be capitalized.
 
 A "ForeignKey" must have "to" and "OtherModel" immediately after "ForeignKey" and a "on_delete" "CASCADE/SET_NULL" attribute pair.
 
-"help_text" values are mandatory (They appear in the forms). They should have single quotes: "'Question text'". Add an apostrophe with \\' : "'Artist\\'s name'"
+"help_text" values are mandatory (They appear in the forms). Do not include double quotes in them.
 
 After generating the app, makemigrations, migrate, add the 'app_name' to settings.py (INSTALLED_APPS) and also include the URLs in projectname/urls.py
 
@@ -20,6 +29,7 @@ from django.urls import path, include
     path('yourapp/', include('yourapp.urls')),
 
 A valid user is needed to interact with the generated pages and models.
+
 
 If using MEDIA
 --------------
