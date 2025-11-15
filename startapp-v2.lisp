@@ -68,7 +68,7 @@ img {
   max-width: 300px;
 }
 
-h3 {
+h1, h2, h3 {
   margin: 1rem;
   padding: 0;
 }
@@ -172,6 +172,10 @@ input[type=submit] {
 .item-details {
   padding: 0.5rem;
   background-color: PapayaWhip;
+}
+
+.item-template-text-field {
+  margin: 0.2rem 0 0 0.5rem;
 }
 "
   "Hardcoded CRUD pages' styles.")
@@ -583,6 +587,7 @@ app_name = '~A'
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('crudadmin/', views.crudadmin_index, name='crudadmin_index'),
 ~{~{    path(~A),~%~}~%~}
 ]
 "
@@ -599,7 +604,7 @@ import os
 import uuid
 from decimal import Decimal
 
-from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect
@@ -608,13 +613,18 @@ from django.utils.datastructures import MultiValueDictKeyError
 from . import models
 
 
-@login_required
 def index(request):
     return render(request, '~A/index.html')
 
-~{~{@login_required
+
+@staff_member_required
+def crudadmin_index(request):
+    return render(request, '~A/crudadmin_index.html')
+
+~{~{@staff_member_required
 ~A~%~}~}
 "
+            *app-name*
             *app-name*
             (mapcar #'(lambda (model) (crud-views model)) (getf *spec* :models)))))
 
@@ -650,9 +660,21 @@ from django.test import TestCase
     (format out *html-base*
             *app-name*
             *app-name*
+            "")))
+
+(defun write-crudadmin-base-template ()
+  "Write templates/app-name/crudadmin_base.html."
+  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "crudadmin_base.html"
+    (format out *html-base*
+            *app-name*
+            *app-name*
             (format nil "<div class=\"topbar\">
+            <a class='link' href='/~A/'>~A</a>
+            <a class='link' href='/~A/crudadmin/'>Admin Home</a>
 ~{            ~A~%~}
         </div>"
+                    *app-name* *app-name*
+                    *app-name*
                     (mapcar #'header-link (getf *spec* :models))))))
 
 (defun index-model-links (app-name models)
@@ -674,17 +696,36 @@ from django.test import TestCase
 {% block pagetitle %}Home{% endblock %}
 
 {% block content %}
+<h1>~A</h1>
+
+<h3><a href=\"crudadmin/\">CRUD Admin</a></h3>
+{% endblock %}
+"
+            *app-name*
+            *app-name*)))
+
+
+(defun write-crudadmin-index-template ()
+  "Write templates/app-name/crudadmin_index.html."
+  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "crudadmin_index.html"
+    (format out "{% extends '~A/crudadmin_base.html' %}
+{% block pagetitle %}crudadmin Home{% endblock %}
+
+{% block content %}
+<h1>CRUD Admin</h1>
+
 ~{~A~}
 {% endblock %}
 "
             *app-name*
             (index-model-links *app-name* (getf *spec* :models)))))
 
+
 (defun write-list-template (templates-dir model)
   "Write model_name_list.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_list" ".html")
-      (format out "{% extends '~A/base.html' %}
+      (format out "{% extends '~A/crudadmin_base.html' %}
 {% block pagetitle %}~A - List{% endblock %}
 
 {% block content %}
@@ -773,7 +814,7 @@ from django.test import TestCase
   "Write model_name_add.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_add" ".html")
-      (format out "{% extends '~A/base.html' %}
+      (format out "{% extends '~A/crudadmin_base.html' %}
 {% block pagetitle %}~A - Add{% endblock %}
 
 {% block content %}
@@ -793,19 +834,21 @@ from django.test import TestCase
   "Return the field of a generic item."
   (let ((field-type (caadr field)))
     (cond ((string= field-type "ImageField")
-           (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</p>" (car field) (car field) (car field)))
+           (format nil "<div><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</div>" (car field) (car field) (car field)))
           ((string= field-type "BooleanField")
-           (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}True{% else %}False{% endif %}</p>" (car field) (car field)))
+           (format nil "<div><strong>{{ help_text.~A }}</strong>: {% if item.~A %}True{% else %}False{% endif %}</div>" (car field) (car field)))
+          ((string= field-type "TextField")
+           (format nil "<div><strong>{{ help_text.~A }}</strong><br><pre class='item-template-text-field'>{{ item.~A }}</pre></div>" (car field) (car field)))
           ((string= field-type "ForeignKey")
            (let ((foreign-key-name (nth 2 (cadr field))))
-             (format nil "<p><strong>{{ help_text.~A }}</strong>: <a href='../../../~A/item/{{ item.~A.pk }}'>{{ item.~A }}</a></p>" (car field) (string-downcase foreign-key-name) (car field) (car field))))
-          (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
+             (format nil "<div><strong>{{ help_text.~A }}</strong>: <a href='../../../~A/item/{{ item.~A.pk }}'>{{ item.~A }}</a></div>" (car field) (string-downcase foreign-key-name) (car field) (car field))))
+          (t (format nil "<div><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</div>" (car field) (car field))))))
 
 (defun write-item-template (templates-dir model)
   "Write model_name_item.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_item" ".html")
-      (format out "{% extends '~A/base.html' %}
+      (format out "{% extends '~A/crudadmin_base.html' %}
 {% block pagetitle %}~A - Item{% endblock %}
 
 {% block content %}
@@ -836,7 +879,7 @@ from django.test import TestCase
   "Write model_name_edit.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_edit" ".html")
-      (format out "{% extends '~A/base.html' %}
+      (format out "{% extends '~A/crudadmin_base.html' %}
 {% block pagetitle %}~A - Edit{% endblock %}
 
 {% block content %}
@@ -856,7 +899,7 @@ from django.test import TestCase
   "Write model_name_delete.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_delete" ".html")
-      (format out "{% extends '~A/base.html' %}
+      (format out "{% extends '~A/crudadmin_base.html' %}
 {% block pagetitle %}~A - Delete{% endblock %}
 
 {% block content %}
@@ -965,7 +1008,9 @@ spec in *spec* and save output to full-output-dir (include a trailing slash)."
 
   ;; Templates
   (write-base-template)
+  (write-crudadmin-base-template)
   (write-index-template)
+  (write-crudadmin-index-template)
   (write-templates)
 
   ;; Other static files
