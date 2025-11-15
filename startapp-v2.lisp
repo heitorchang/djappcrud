@@ -8,27 +8,21 @@
 (defparameter *specs-dir* "~/code/djappcrud/specs/"
   "Location of app spec Lisp objects. Save specs for a possible use later.")
 
-
 ;;; Define these variables with defvar so that re-evaluating this buffer will not reset them.
 (defvar *output-base-dir* ""
   "Django project to hold the newly created app.")
 
-
 (defvar *output-app-dir* ""
   "Directory of the newly created app.")
-
 
 (defvar *spec* nil
   "Lisp object containing the models' spec, to be loaded from *specs-dir*.")
 
-
 (defvar *app-name* ""
   "Top-level name that appears often, stored here for convenience.")
 
-
 (defun header-link (model)
   "Create an HTML link for the header."
-
   (format nil "<a class='link' href='/~A/crudadmin/~A/list/'>~A</a>"
           *app-name*
           (string-downcase (getf model :model-name))
@@ -36,7 +30,6 @@
 
 
 (defparameter *html-base* "{% load static %}
-
 <!DOCTYPE html>
 <html lang=\"en\">
     <head>
@@ -56,9 +49,7 @@
 </html>
 ")
 
-
 (defparameter *style-css* "/* style-css */
-
 html {
   box-sizing: border-box;
 }
@@ -185,7 +176,6 @@ input[type=submit] {
 "
   "Hardcoded CRUD pages' styles.")
 
-
 ;;;
 ;;; Convenience functions
 ;;;
@@ -194,11 +184,9 @@ input[type=submit] {
   "Concatenate dir and names."
   (apply #'concatenate 'string dir names))
 
-
 (defun join-names (&rest names)
   "Concatenate names."
   (apply #'concatenate 'string names))
-
 
 (defmacro with-out-to-dir-file (directory simple-filename &rest body)
   "Prepare file output to directory/simple-filename."
@@ -217,25 +205,20 @@ input[type=submit] {
 (defun get-model-names ()
   (mapcar #'(lambda (model) (getf model :model-name)) (getf *spec* :models)))
 
-
 (defun convert-pairs (pairs)
   "Convert a list of properties in a flat list, such as (a 1 b 2 c 3)."
   (format nil "~{~A=~A, ~}" pairs))
-
 
 (defun convert-model-field-value (field-value)
   "Convert the value side of the field assignment."
   (format nil "~A(~A)" (car field-value) (convert-pairs (cdr field-value))))
 
-
 (defun convert-model-field (field)
   "Convert a model field assignment."
   (format nil "~A = ~A" (car field) (convert-model-field-value (cadr field))))
 
-
 (defun convert-model (model)
   "Convert a model object to Python code."
-
   (format nil "class ~A(Model):
     user = ForeignKey(User, blank=True, null=True, on_delete=SET_NULL)
 ~{    ~A~%~}
@@ -249,19 +232,15 @@ input[type=submit] {
           (getf model :ordering)
           (getf model :str)))
 
-
 (defun url-name (model-name action &optional (url-component ""))
   "Create URL components from the model name and action."
-
   (format nil "'crudadmin/~A/~A/~A', views.~A_~A, name='~A_~A'"
           (string-downcase model-name) action url-component
           (string-downcase model-name) action
           (string-downcase model-name) action))
 
-
 (defun crud-urls (model-name)
   "Generate URLs for the given name, returning a list of path components."
-
   (list (url-name model-name "list")
         (url-name model-name "item" "<int:item_id>/")
         (url-name model-name "add")
@@ -271,10 +250,8 @@ input[type=submit] {
         (url-name model-name "delete" "<int:item_id>/")
         (url-name model-name "do_delete")))
 
-
 (defun list-view (model)
   "View function to display a list of items."
-
   (let ((action "list")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -285,31 +262,24 @@ input[type=submit] {
             model-name
             *app-name* (string-downcase model-name) action)))
 
-
 (defun view-foreign-key (foreign-key)
   "Definition of an individual foreign key."
-
   (let ((model-name (nth 2 (cadr foreign-key))))
     (format nil "~A = models.~A.objects.filter(user=request.user)" (car foreign-key) model-name)))
 
 
 (defun view-foreign-keys (fields)
   "Definition of foreign keys."
-
   (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
     (format nil "~{    ~A~%~}" (mapcar #'view-foreign-key foreign-keys))))
 
-
 (defun context-foreign-keys (fields)
   "Helper to populate template context with foreign keys."
-
   (let ((foreign-keys (remove-if-not #'(lambda (field) (string= (caadr field) "ForeignKey")) fields)))
     (format nil "{~{~A~}}" (mapcar #'(lambda (foreign-key) (format nil "'~A': ~A, " (car foreign-key) (car foreign-key))) foreign-keys))))
 
-
 (defun context-help-text (fields)
   "Helper to read help_text values and generate a dict."
-
   (let ((fields-with-help (remove-if-not #'(lambda (field)
                                              (let ((attributes (cadr field)))
                                                (member "help_text" attributes :test #'equal)))
@@ -322,10 +292,8 @@ input[type=submit] {
                           (list field-name (nth (1+ help-index) attributes))))
                     fields-with-help))))
 
-
 (defun context-max-length (fields)
   "Helper to read max_length values and generate a dict."
-
   (let ((fields-with-help (remove-if-not #'(lambda (field)
                                              (let ((attributes (cadr field)))
                                                (member "max_length" attributes :test #'equal)))
@@ -338,10 +306,8 @@ input[type=submit] {
                           (list field-name (nth (1+ help-index) attributes))))
                     fields-with-help))))
 
-
 (defun add-view (model)
   "View function to show the add form."
-
   (let ((action "add")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -358,10 +324,8 @@ input[type=submit] {
             (context-max-length (getf model :fields))
             *app-name* (string-downcase model-name))))
 
-
 (defun item-view (model)
   "View function to display an item's details."
-
   (let ((action "item")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -375,10 +339,8 @@ input[type=submit] {
             (context-help-text (getf model :fields))
             *app-name* (string-downcase model-name) action)))
 
-
 (defun form-post-request-item (model-field)
   "Object or value to be read from POST data."
-
   (let ((foreign-key-model-name (nth 2 (cadr model-field)))
         (field-name (car model-field))
         (field-type (caadr model-field)))
@@ -410,18 +372,14 @@ input[type=submit] {
           (t (format nil "~A = request.POST['~A']"
                      field-name field-name)))))
 
-
 (defun do-add-view-field-pairs (model-field)
   "Assignment of a value to an argument."
-
   (format nil "~A=~A,"
           (car model-field)
           (car model-field)))
 
-
 (defun do-add-view (model)
   "View function that creates an item."
-
   (let ((action "do_add")
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
@@ -441,10 +399,8 @@ input[type=submit] {
             (mapcar #'do-add-view-field-pairs model-fields)
             *app-name* (string-downcase model-name))))
 
-
 (defun edit-view (model)
   "View function to show edit form."
-
   (let ((action "edit")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -464,10 +420,8 @@ input[type=submit] {
             (context-max-length (getf model :fields))
             *app-name* (string-downcase model-name) action)))
 
-
 (defun do-edit-view-field-pairs (model-field)
   "Assignment of a value to an item's field."
-
   (format nil "if ~A:
         item.~A = ~A
 ~A"
@@ -477,10 +431,8 @@ input[type=submit] {
               (format nil "    else:
         item.~A = False~%" (car model-field)) "")))
 
-
 (defun do-edit-view (model)
   "View function that saves an edit of an item."
-
   (let ((action "do_edit")
         (model-name (getf model :model-name))
         (model-fields (getf model :fields)))
@@ -503,10 +455,8 @@ input[type=submit] {
             (mapcar #'do-edit-view-field-pairs model-fields)
             *app-name* (string-downcase model-name))))
 
-
 (defun delete-view (model)
   "Delete confirmation view."
-
   (let ((action "delete")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request, item_id):
@@ -517,10 +467,8 @@ input[type=submit] {
             model-name
             *app-name* (string-downcase model-name) action)))
 
-
 (defun do-delete-view (model)
   "View function that deletes an item."
-
   (let ((action "do_delete")
         (model-name (getf model :model-name)))
     (format nil "def ~A_~A(request):
@@ -536,10 +484,8 @@ input[type=submit] {
             model-name
             *app-name* (string-downcase model-name))))
 
-
 (defun view-name-for-model-action (model action)
   "Create a view function definition."
-
   (cond ((string= action "list") (list-view model))
         ((string= action "item") (item-view model))
         ((string= action "add") (add-view model))
@@ -549,10 +495,8 @@ input[type=submit] {
         ((string= action "delete") (delete-view model))
         ((string= action "do_delete") (do-delete-view model))))
 
-
 (defun crud-views (model)
   "Generate views for the given name, returning a list of function definitions."
-
   (list (view-name-for-model-action model "list")
         (view-name-for-model-action model "item")
         (view-name-for-model-action model "add")
@@ -561,7 +505,6 @@ input[type=submit] {
         (view-name-for-model-action model "do_edit")
         (view-name-for-model-action model "delete")
         (view-name-for-model-action model "do_delete")))
-
 
 ;;;
 ;;; Python files
@@ -582,7 +525,6 @@ class ~AConfig(AppConfig):
             (string-capitalize *app-name*)
             *app-name*)))
 
-
 (defun write-admin ()
   "Write admin.py."
   (let ((model-names (get-model-names)))
@@ -598,10 +540,8 @@ from .models import (~{~A, ~})
               model-names
               model-names))))
 
-
 (defun write-models ()
   "Write models.py."
-
   (let ((models (getf *spec* :models)))
     (with-out-to-dir-file *output-app-dir* "models.py"
       (format out "# write-models
@@ -618,10 +558,8 @@ from django.db.models import CharField, TextField, IntegerField, FloatField, Dec
 "
               (mapcar #'convert-model models)))))
 
-
 (defun write-urls ()
   "Write urls.py."
-
   (let ((model-names (get-model-names)))
     (with-out-to-dir-file *output-app-dir* "urls.py"
       (format out "# write-urls
@@ -639,10 +577,8 @@ urlpatterns = [
               *app-name*
               (mapcar #'crud-urls model-names)))))
 
-
 (defun write-views ()
   "Write views.py."
-
   (with-out-to-dir-file *output-app-dir* "views.py"
     (format out "# write-views
 
@@ -670,10 +606,8 @@ def index(request):
             *app-name*
             (mapcar #'(lambda (model) (crud-views model)) (getf *spec* :models)))))
 
-
 (defun write-tests ()
   "Write tests.py."
-
   (with-out-to-dir-file *output-app-dir* "tests.py"
     (format out "# write-tests
 
@@ -682,17 +616,13 @@ from django.test import TestCase
 # Create your tests here.
 ")))
 
-
 (defun create-init-py ()
   "Create the placeholder file, created by the standard startapp."
-
   (with-out-to-dir-file *output-app-dir* "__init__.py"
     (format out "# __init__~%")))
 
-
 (defun create-migrations-init-py ()
   "Create migrations/__init__.py."
-
   (let ((migrations-dir (add-to-dir *output-app-dir* "migrations/")))
     (ensure-directories-exist migrations-dir)
     (with-out-to-dir-file migrations-dir "__init__.py"
@@ -704,7 +634,6 @@ from django.test import TestCase
 
 (defun write-base-template ()
   "Write templates/app-name/base.html."
-
   (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "base.html"
     (format out *html-base*
             *app-name*
@@ -712,10 +641,8 @@ from django.test import TestCase
             (format nil "<div class=\"topbar\">~{~A~}</div>"
                     (mapcar #'header-link (getf *spec* :models))))))
 
-
 (defun index-model-links (app-name models)
   "Links to the list view of each model."
-
   (mapcar #'(lambda (model)
               (format nil "<div>
     <a class=\"list-link\" href=\"/~A/crudadmin/~A/list/\">~A</a>
@@ -726,10 +653,8 @@ from django.test import TestCase
                       (getf model :model-name)))
           models))
 
-
 (defun write-index-template ()
   "Write templates/app-name/index.html."
-
   (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "index.html"
     (format out "{% extends '~A/base.html' %}
 {% block pagetitle %}Home{% endblock %}
@@ -741,10 +666,8 @@ from django.test import TestCase
             *app-name*
             (index-model-links *app-name* (getf *spec* :models)))))
 
-
 (defun write-list-template (templates-dir model)
   "Write model_name_list.html."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_list" ".html")
       (format out "{% extends '~A/base.html' %}
@@ -770,10 +693,8 @@ from django.test import TestCase
               model-name
               model-name))))
 
-
 (defun form-field (model-field index)
   "Return an appropriate HTML form element for the given model-field."
-
   (let ((field-name (car model-field))
         (field-type (caadr model-field)))
     (format nil "<div>
@@ -813,10 +734,8 @@ from django.test import TestCase
                        (format t "form-field: warning: field-type ~A not defined yet.~%" field-type)
                        (format nil "<input name='~A'>" field-name)))))))
 
-
 (defun write-form-template (templates-dir model form-action)
   "Write an item form appropriate for the form-action."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_" form-action "_form.html")
       (format out "<!-- ~A form -->
@@ -836,10 +755,8 @@ from django.test import TestCase
               (if (string= form-action "edit") (format nil "<input type='hidden' name='id' value='{{ item.id }}'>") "")
               (mapcar #'form-field (getf model :fields) (loop for i from 0 below (length (getf model :fields)) collect i))))))
 
-
 (defun write-add-template (templates-dir model)
   "Write model_name_add.html."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_add" ".html")
       (format out "{% extends '~A/base.html' %}
@@ -858,10 +775,8 @@ from django.test import TestCase
               model-name
               *app-name* (string-downcase model-name)))))
 
-
 (defun item-template-field (field)
   "Return the field of a generic item."
-
   (let ((field-type (caadr field)))
     (cond ((string= field-type "ImageField")
            (format nil "<p><strong>{{ help_text.~A }}</strong>: {% if item.~A %}<img src='/media/{{ item.~A }}'>{% endif %}</p>" (car field) (car field) (car field)))
@@ -872,10 +787,8 @@ from django.test import TestCase
              (format nil "<p><strong>{{ help_text.~A }}</strong>: <a href='../../../~A/item/{{ item.~A.pk }}'>{{ item.~A }}</a></p>" (car field) (string-downcase foreign-key-name) (car field) (car field))))
           (t (format nil "<p><strong>{{ help_text.~A }}</strong>: {{ item.~A }}</p>" (car field) (car field))))))
 
-
 (defun write-item-template (templates-dir model)
   "Write model_name_item.html."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_item" ".html")
       (format out "{% extends '~A/base.html' %}
@@ -905,10 +818,8 @@ from django.test import TestCase
               model-name
               (mapcar #'item-template-field (getf model :fields))))))
 
-
 (defun write-edit-template (templates-dir model)
   "Write model_name_edit.html."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_edit" ".html")
       (format out "{% extends '~A/base.html' %}
@@ -927,10 +838,8 @@ from django.test import TestCase
               model-name
               *app-name* (string-downcase model-name)))))
 
-
 (defun write-delete-template (templates-dir model)
   "Write model_name_delete.html."
-
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_delete" ".html")
       (format out "{% extends '~A/base.html' %}
@@ -954,10 +863,8 @@ from django.test import TestCase
               model-name
               model-name))))
 
-
 (defun write-template-for-model-action (templates-dir model action)
   "Call specific template-writing function based on the given action."
-
   (cond ((string= action "list") (write-list-template templates-dir model))
         ((string= action "add_form") (write-form-template templates-dir model "add"))
         ((string= action "add") (write-add-template templates-dir model))
@@ -967,10 +874,8 @@ from django.test import TestCase
         ((string= action "delete") (write-delete-template templates-dir model))
         (t (format t "write-template-for-model-action: unknown action type: ~A" action))))
 
-
 (defun write-templates-for-model (templates-dir model)
   "Call write-template-for-model-action with given actions."
-
   (write-template-for-model-action templates-dir model "list")
   (write-template-for-model-action templates-dir model "add_form")
   (write-template-for-model-action templates-dir model "add")
@@ -979,10 +884,8 @@ from django.test import TestCase
   (write-template-for-model-action templates-dir model "edit")
   (write-template-for-model-action templates-dir model "delete"))
 
-
 (defun write-templates ()
   "Write HTML templates."
-
   (let* ((models (getf *spec* :models))
          (templates-dir (add-to-dir *output-app-dir* "templates/" *app-name* "/")))
     (dolist (model models)
@@ -1005,7 +908,6 @@ from django.test import TestCase
 (defun backup-and-prepare-app-dir ()
   "Check for existing app directory, and back up its contents to the project-level backup/
 directory if it exists. If not, create the target app directory."
-
   (setf *output-app-dir* (add-to-dir *output-base-dir* *app-name* "/"))
   ;; make a backup of existing version
   (when (probe-file *output-app-dir*)
@@ -1013,7 +915,6 @@ directory if it exists. If not, create the target app directory."
            (timestamped-backup-dir (add-to-dir backup-base-dir *app-name* "_" (format nil "~A" (get-universal-time)) "/")))
       (ensure-directories-exist backup-base-dir)
       (rename-file *output-app-dir* timestamped-backup-dir)
-
       ;; copy migration files back to "real" app directory
       (ensure-directories-exist (add-to-dir *output-app-dir* "migrations/"))
       (dolist (file (uiop:directory-files (add-to-dir timestamped-backup-dir "migrations/")))
@@ -1028,7 +929,6 @@ directory if it exists. If not, create the target app directory."
   "Return the Lisp object found in *specs-dir*/simple-filename, including the .lisp extension."
   (with-open-file (in (add-to-dir *specs-dir* simple-filename))
     (read in)))
-
 
 (defun convert-spec (simple-filename full-output-dir)
   "Given a filename located in *specs-dir*, including the .lisp extension, store the Lisp object
