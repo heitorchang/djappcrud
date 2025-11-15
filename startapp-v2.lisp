@@ -4,12 +4,13 @@
 ;;; Check for TODO ;;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;;; Add a trailing slash to directory strings
+;;; Add a trailing slash to directory strings.
 (defparameter *specs-dir* "/home/hcbel/code/djappcrud/specs/"
-  "Location of app spec Lisp objects.")
+  "Location of app spec Lisp objects. Save specs for a possible use later.")
 
 
-(defparameter *output-base-dir* "/home/hcbel/code/crudproject/"
+;;; Define these variables with defvar so that re-evaluating this buffer will not reset them.
+(defvar *output-base-dir* ""
   "Django project to hold the newly created app.")
 
 
@@ -71,9 +72,16 @@ TODO
       (format out "# __init__~%"))))
 
 
+(defun write-static-style-css ()
+  (let ((static-css-dir (add-to-dir *output-app-dir* "static/" *app-name* "/css/")))
+    (ensure-directories-exist static-css-dir)
+    (with-out-to-dir-file static-css-dir "style.css"
+      (format out *style-css*))))
+
+
 (defun backup-and-prepare-app-dir ()
-  "Check for existing app directory, and back up its contents to the projectl-level backup/
-directory if it exists. In any case, make sure the target app directory will exist."
+  "Check for existing app directory, and back up its contents to the project-level backup/
+directory if it exists. If not, create the target app directory."
 
   (setf *output-app-dir* (add-to-dir *output-base-dir* *app-name* "/"))
   ;; make a backup of existing version
@@ -96,9 +104,14 @@ directory if it exists. In any case, make sure the target app directory will exi
     (read in)))
 
 
-(defun convert-spec (simple-filename)
+(defun convert-spec (simple-filename full-output-dir)
   "Given a filename located in *specs-dir*, including the .lisp extension, store the Lisp object
-spec in *spec* and process it."
+spec in *spec* and save output to full-output-dir (include a trailing slash).
+
+Example:
+(convert-spec \"albums.lisp\" \"/home/hcbel/code/crudproject/\")
+"
+  (setf *output-base-dir* full-output-dir)
   (setf *spec* (read-spec simple-filename))
   (setf *app-name* (getf *spec* :app-name))
 
@@ -115,9 +128,11 @@ spec in *spec* and process it."
   ;; (write-tests)
 
   ;; Replace templates with ones including "base.html"
-  ;; (write-index-template)
   ;; (write-templates)
-  ;; (write-static-style-css)
+  ;; (write-index-template)
+
+  ;; Other static files
+  (write-static-style-css)
 
   ;; print the spec's human-readable name
   (getf *spec* :spec))
