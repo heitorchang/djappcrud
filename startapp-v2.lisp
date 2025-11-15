@@ -1,4 +1,4 @@
-;;; Dj App CRUD
+;;;; Dj App CRUD
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;;; Check for TODO ;;;
@@ -40,6 +40,10 @@ TODO
   "Hardcoded CRUD pages' styles.")
 
 
+;;;
+;;; Convenience functions
+;;;
+
 (defun add-to-dir (dir &rest names)
   "Concatenate dir and names."
   (apply #'concatenate 'string dir names))
@@ -55,6 +59,9 @@ TODO
                           :if-exists :supersede)
        ,@body)))
 
+;;;
+;;; Python files
+;;;
 
 (defun create-init-py ()
   "Create the placeholder file, created by the standard startapp."
@@ -71,6 +78,15 @@ TODO
     (with-out-to-dir-file migrations-dir "__init__.py"
       (format out "# __init__~%"))))
 
+;;;
+;;; Templates
+;;;
+
+;;; TODO
+
+;;;
+;;; Other static files (not templates)
+;;;
 
 (defun write-static-style-css ()
   (let ((static-css-dir (add-to-dir *output-app-dir* "static/" *app-name* "/css/")))
@@ -78,6 +94,9 @@ TODO
     (with-out-to-dir-file static-css-dir "style.css"
       (format out *style-css*))))
 
+;;;
+;;; Directory and file management
+;;;
 
 (defun backup-and-prepare-app-dir ()
   "Check for existing app directory, and back up its contents to the project-level backup/
@@ -97,6 +116,9 @@ directory if it exists. If not, create the target app directory."
         (uiop:copy-file file (add-to-dir *output-app-dir* "migrations/" (file-namestring file))))))
   (ensure-directories-exist *output-app-dir*))
 
+;;;
+;;; Spec processing
+;;;
 
 (defun read-spec (simple-filename)
   "Return the Lisp object found in *specs-dir*/simple-filename, including the .lisp extension."
@@ -134,5 +156,5 @@ Example:
   ;; Other static files
   (write-static-style-css)
 
-  ;; print the spec's human-readable name
+  ;; Output the spec's human-readable name
   (getf *spec* :spec))
