@@ -1,4 +1,4 @@
 Version 2
 
-[  ] Use actual CSS file
+[  ] Use actual CSS file from a "static" directory and copy that to project's static dir (same for templates)
 [  ] Use template base.html and includes
