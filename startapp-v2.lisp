@@ -1,56 +1,123 @@
 ;;; Dj App CRUD
 
+;;;;;;;;;;;;;;;;;;;;;;
+;;; Check for TODO ;;;
+;;;;;;;;;;;;;;;;;;;;;;
+
 ;;; Add a trailing slash to directory strings
 (defparameter *specs-dir* "/home/hcbel/code/djappcrud/specs/"
   "Location of app spec Lisp objects.")
 
+
 (defparameter *output-base-dir* "/home/hcbel/code/crudproject/"
   "Django project to hold the newly created app.")
 
-(defparameter *output-app-dir* ""
+
+(defvar *output-app-dir* ""
   "Directory of the newly created app.")
 
-(defparameter *app-spec* nil
+
+(defvar *spec* nil
   "Lisp object containing the models' spec, to be loaded from *specs-dir*.")
 
-(defparameter *html-base* "TODO"
+
+(defvar *app-name* ""
+  "Top-level name that appears often, stored here for convenience.")
+
+
+(defparameter *html-base* "
+TODO
+...
+"
   "Hardcoded base template.")
 
-(defparameter *style-css* "TODO"
+
+(defparameter *style-css* "
+TODO
+...
+"
   "Hardcoded CRUD pages' styles.")
 
-(defmacro with-out-to-app-file (filename &rest body)
-  `(with-open-file (out (concatenate 'string *output-app-dir* ,filename)
-                        :direction :output
-                        :if-exists :supersede)
-     ,@body))
+
+(defun add-to-dir (dir &rest names)
+  "Concatenate dir and names."
+  (apply #'concatenate 'string dir names))
+
+
+(defmacro with-out-to-dir-file (directory simple-filename &rest body)
+  "Prepare file output to directory/simple-filename."
+
+  `(let ((full-filename (add-to-dir ,directory ,simple-filename)))
+     (ensure-directories-exist full-filename)
+     (with-open-file (out full-filename
+                          :direction :output
+                          :if-exists :supersede)
+       ,@body)))
+
 
 (defun create-init-py ()
-  (with-out-to-app-file "__init__.py"
+  "Create the placeholder file, created by the standard startapp."
+
+  (with-out-to-dir-file *output-app-dir* "__init__.py"
     (format out "# __init__~%")))
 
-(defun prepare-and-backup-app-dir ()
-  (setf *output-app-dir* (concatenate 'string *output-base-dir* (getf *app-spec* :app-name) "/"))
+
+(defun create-migrations-init-py ()
+  "Create migrations/__init__.py."
+
+  (let ((migrations-dir (add-to-dir *output-app-dir* "migrations/")))
+    (ensure-directories-exist migrations-dir)
+    (with-out-to-dir-file migrations-dir "__init__.py"
+      (format out "# __init__~%"))))
+
+
+(defun backup-and-prepare-app-dir ()
+  "Check for existing app directory, and back up its contents to the projectl-level backup/
+directory if it exists. In any case, make sure the target app directory will exist."
+
+  (setf *output-app-dir* (add-to-dir *output-base-dir* *app-name* "/"))
   ;; make a backup of existing version
   (when (probe-file *output-app-dir*)
-    (let* ((backup-base-dir (concatenate 'string *output-base-dir* "backup/"))
-           (timestamped-backup-dir (concatenate 'string backup-base-dir (getf *app-spec* :app-name) "_" (format nil "~A" (get-universal-time)) "/")))
+    (let* ((backup-base-dir (add-to-dir *output-base-dir* "backup/"))
+           (timestamped-backup-dir (add-to-dir backup-base-dir *app-name* "_" (format nil "~A" (get-universal-time)) "/")))
       (ensure-directories-exist backup-base-dir)
       (rename-file *output-app-dir* timestamped-backup-dir)
+
       ;; copy migration files back to "real" app directory
-      (ensure-directories-exist (concatenate 'string *output-app-dir* "migrations/"))
-      (dolist (file (uiop:directory-files (concatenate 'string timestamped-backup-dir "migrations/")))
-        (uiop:copy-file file (concatenate 'string *output-app-dir* "migrations/" (file-namestring file))))))
+      (ensure-directories-exist (add-to-dir *output-app-dir* "migrations/"))
+      (dolist (file (uiop:directory-files (add-to-dir timestamped-backup-dir "migrations/")))
+        (uiop:copy-file file (add-to-dir *output-app-dir* "migrations/" (file-namestring file))))))
   (ensure-directories-exist *output-app-dir*))
 
+
 (defun read-spec (simple-filename)
-  "Load and return the Lisp object found in *specs-dir*/simple-filename."
-  (with-open-file (in (concatenate 'string *specs-dir* simple-filename))
+  "Return the Lisp object found in *specs-dir*/simple-filename, including the .lisp extension."
+  (with-open-file (in (add-to-dir *specs-dir* simple-filename))
     (read in)))
+
 
 (defun convert-spec (simple-filename)
   "Given a filename located in *specs-dir*, including the .lisp extension, store the Lisp object
-in *app-spec* and process it."
-  (setf *app-spec* (read-spec simple-filename))
-  (prepare-and-backup-app-dir)
-  (create-init-py))
+spec in *spec* and process it."
+  (setf *spec* (read-spec simple-filename))
+  (setf *app-name* (getf *spec* :app-name))
+
+  (backup-and-prepare-app-dir)
+  (create-init-py)
+  (create-migrations-init-py)
+
+  ;; TODO
+  ;; (write-apps)
+  ;; (write-admin)
+  ;; (write-models)
+  ;; (write-urls)
+  ;; (write-views)
+  ;; (write-tests)
+
+  ;; Replace templates with ones including "base.html"
+  ;; (write-index-template)
+  ;; (write-templates)
+  ;; (write-static-style-css)
+
+  ;; print the spec's human-readable name
+  (getf *spec* :spec))
