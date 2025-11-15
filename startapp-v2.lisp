@@ -650,7 +650,9 @@ from django.test import TestCase
     (format out *html-base*
             *app-name*
             *app-name*
-            (format nil "<div class=\"topbar\">~{~A~}</div>"
+            (format nil "<div class=\"topbar\">
+~{            ~A~%~}
+        </div>"
                     (mapcar #'header-link (getf *spec* :models))))))
 
 (defun index-model-links (app-name models)
