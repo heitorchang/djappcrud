@@ -23,3 +23,5 @@ If using MEDIA, add to the end of urlpatterns:
 
     ...
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+A valid user is needed to interact with the generated pages and models.
