@@ -23,7 +23,7 @@
 
 (defun header-link (model)
   "Create an HTML link for the header."
-  (format nil "<a class='link' href='/~A/crudadmin/~A/list/'>~A</a>"
+  (format nil "<a class='link' href='/~A/manage/~A/list/'>~A</a>"
           *app-name*
           (string-downcase (getf model :model-name))
           (getf model :model-name)))
@@ -250,7 +250,7 @@ input[type=submit] {
 
 (defun url-name (model-name action &optional (url-component ""))
   "Create URL components from the model name and action."
-  (format nil "'crudadmin/~A/~A/~A', views.~A_~A, name='~A_~A'"
+  (format nil "'manage/~A/~A/~A', views.~A_~A, name='~A_~A'"
           (string-downcase model-name) action url-component
           (string-downcase model-name) action
           (string-downcase model-name) action))
@@ -587,7 +587,7 @@ app_name = '~A'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('crudadmin/', views.crudadmin_index, name='crudadmin_index'),
+    path('manage/', views.manage_index, name='manage_index'),
 ~{~{    path(~A),~%~}~%~}
 ]
 "
@@ -618,8 +618,8 @@ def index(request):
 
 
 @staff_member_required
-def crudadmin_index(request):
-    return render(request, '~A/crudadmin_index.html')
+def manage_index(request):
+    return render(request, '~A/manage_index.html')
 
 ~{~{@staff_member_required
 ~A~%~}~}
@@ -662,15 +662,15 @@ from django.test import TestCase
             *app-name*
             "")))
 
-(defun write-crudadmin-base-template ()
-  "Write templates/app-name/crudadmin_base.html."
-  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "crudadmin_base.html"
+(defun write-manage-base-template ()
+  "Write templates/app-name/manage_base.html."
+  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "manage_base.html"
     (format out *html-base*
             *app-name*
             *app-name*
             (format nil "<div class=\"topbar\">
             <a class='link' href='/~A/'>~A</a>
-            <a class='link' href='/~A/crudadmin/'>Admin Home</a>
+            <a class='link' href='/~A/manage/'>Manage data</a>
 ~{            ~A~%~}
         </div>"
                     *app-name* *app-name*
@@ -681,7 +681,7 @@ from django.test import TestCase
   "Links to the list view of each model."
   (mapcar #'(lambda (model)
               (format nil "<div>
-    <a class=\"list-link\" href=\"/~A/crudadmin/~A/list/\">~A</a>
+    <a class=\"list-link\" href=\"/~A/manage/~A/list/\">~A</a>
 </div>
 "
                       app-name
@@ -698,21 +698,21 @@ from django.test import TestCase
 {% block content %}
 <h1>~A</h1>
 
-<h3><a href=\"crudadmin/\">CRUD Admin</a></h3>
+<h3><a href=\"manage/\">Manage data</a></h3>
 {% endblock %}
 "
             *app-name*
             *app-name*)))
 
 
-(defun write-crudadmin-index-template ()
-  "Write templates/app-name/crudadmin_index.html."
-  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "crudadmin_index.html"
-    (format out "{% extends '~A/crudadmin_base.html' %}
-{% block pagetitle %}crudadmin Home{% endblock %}
+(defun write-manage-index-template ()
+  "Write templates/app-name/manage_index.html."
+  (with-out-to-dir-file (add-to-dir *output-app-dir* "templates/" *app-name* "/") "manage_index.html"
+    (format out "{% extends '~A/manage_base.html' %}
+{% block pagetitle %}manage Home{% endblock %}
 
 {% block content %}
-<h1>CRUD Admin</h1>
+<h1>Manage data</h1>
 
 ~{~A~}
 {% endblock %}
@@ -725,7 +725,7 @@ from django.test import TestCase
   "Write model_name_list.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_list" ".html")
-      (format out "{% extends '~A/crudadmin_base.html' %}
+      (format out "{% extends '~A/manage_base.html' %}
 {% block pagetitle %}~A - List{% endblock %}
 
 {% block content %}
@@ -814,7 +814,7 @@ from django.test import TestCase
   "Write model_name_add.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_add" ".html")
-      (format out "{% extends '~A/crudadmin_base.html' %}
+      (format out "{% extends '~A/manage_base.html' %}
 {% block pagetitle %}~A - Add{% endblock %}
 
 {% block content %}
@@ -848,7 +848,7 @@ from django.test import TestCase
   "Write model_name_item.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_item" ".html")
-      (format out "{% extends '~A/crudadmin_base.html' %}
+      (format out "{% extends '~A/manage_base.html' %}
 {% block pagetitle %}~A - Item{% endblock %}
 
 {% block content %}
@@ -879,7 +879,7 @@ from django.test import TestCase
   "Write model_name_edit.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_edit" ".html")
-      (format out "{% extends '~A/crudadmin_base.html' %}
+      (format out "{% extends '~A/manage_base.html' %}
 {% block pagetitle %}~A - Edit{% endblock %}
 
 {% block content %}
@@ -899,7 +899,7 @@ from django.test import TestCase
   "Write model_name_delete.html."
   (let ((model-name (getf model :model-name)))
     (with-out-to-dir-file templates-dir (join-names (string-downcase model-name) "_delete" ".html")
-      (format out "{% extends '~A/crudadmin_base.html' %}
+      (format out "{% extends '~A/manage_base.html' %}
 {% block pagetitle %}~A - Delete{% endblock %}
 
 {% block content %}
@@ -1008,9 +1008,9 @@ spec in *spec* and save output to full-output-dir (include a trailing slash)."
 
   ;; Templates
   (write-base-template)
-  (write-crudadmin-base-template)
+  (write-manage-base-template)
   (write-index-template)
-  (write-crudadmin-index-template)
+  (write-manage-index-template)
   (write-templates)
 
   ;; Other static files
