@@ -604,7 +604,7 @@ import os
 import uuid
 from decimal import Decimal
 
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect
@@ -617,11 +617,11 @@ def index(request):
     return render(request, '~A/index.html')
 
 
-@staff_member_required
+@login_required
 def manage_index(request):
     return render(request, '~A/manage_index.html')
 
-~{~{@staff_member_required
+~{~{@login_required
 ~A~%~}~}
 "
             *app-name*
