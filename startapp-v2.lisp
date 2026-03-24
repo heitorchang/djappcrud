@@ -442,7 +442,9 @@ input[type=submit] {
         item.~A = ~A
 ~A"
           (car model-field)
-          (car model-field) (car model-field)
+          (car model-field) (if (string= (caadr model-field) "DateField")
+                                (format nil "datetime.strptime(~A, '%Y-%m-%d')" (car model-field))
+                                (car model-field))
           (if (string= (caadr model-field) "BooleanField")
               (format nil "    else:
         item.~A = False~%" (car model-field)) "")))
@@ -912,7 +914,15 @@ from django.test import TestCase
     {% csrf_token %}
     <input type='hidden' name='id' value='{{ item.id }}'>
     <input type='submit' value='Yes, delete it'>
+
+<br><br>
+
+    <div>
+    <h4><a href='javascript:history.back()'>No, go back</a></h4>
+    </div>
+
 </form>
+
 
 {% endblock %}
 "
