@@ -22,4 +22,4 @@
                               ("fees" ("DecimalField" "decimal_places" "2" "max_digits" "12" "help_text" "Fees"))
                               ("notes" ("TextField" "blank" "True" "help_text" "Notes")))
                      :ordering "['-date', 'instrument']"
-                     :str "self.date.strftime('%Y-%m-%d') + ' ' + self.action.name + ' ' + self.instrument + ' x' + str(self.quantity)")))
+                     :str "self.date.strftime('%Y-%m-%d') + ' ' + self.broker.name + ' ' + self.action.name + ' ' + self.instrument + ' x' + str(self.quantity)")))
